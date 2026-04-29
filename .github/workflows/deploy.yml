@@ -37,15 +37,12 @@ jobs:
         with:
           node-version: 20
           cache: 'npm'
-          cache-dependency-path: the-architectural-ledger/package-lock.json
 
       - name: Install dependencies
         run: npm install
-        working-directory: the-architectural-ledger
 
       - name: Build
         run: npm run build
-        working-directory: the-architectural-ledger
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
@@ -56,8 +53,8 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          # Upload the dist folder from the project directory
-          path: './the-architectural-ledger/dist'
+          # Upload the dist folder from the root
+          path: './dist'
 
       - name: Deploy to GitHub Pages
         id: deployment
