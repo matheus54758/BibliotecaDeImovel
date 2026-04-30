@@ -3,7 +3,6 @@ import { useTranslation } from "react-i18next";
 import { supabase } from "../lib/supabase";
 import { Link } from "react-router-dom";
 import { formatCurrency } from "../lib/utils";
-import { Button } from "../components/Button";
 
 export const Consultancy = () => {
   const { t } = useTranslation();

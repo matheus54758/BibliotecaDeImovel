@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import { supabase } from "../lib/supabase";
 
 export const Dashboard = () => {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const [metrics, setMetrics] = useState({ builders: 0, projects: 0, leads: 0 });
   const [activities, setActivities] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -135,26 +135,3 @@ const ActivityItem = ({ title, desc, time, icon, iconColor, bgColor }: any) => (
   </div>
 );
 
-const MeetingItem = ({ date, month, title, time }: any) => {
-  const { t } = useTranslation();
-  return (
-    <div className="flex items-center justify-between mb-4 border-b border-surface-container-high pb-4 last:border-0 last:pb-0">
-      <div className="flex items-center">
-        <div className="w-12 h-12 bg-surface-container-low rounded flex flex-col items-center justify-center mr-4">
-          <span className="text-xs font-bold text-primary uppercase">{month}</span>
-          <span className="text-lg font-bold text-on-surface leading-none">{date}</span>
-        </div>
-        <div>
-          <p className="font-body font-semibold text-on-surface">{title}</p>
-          <p className="text-sm text-on-surface/60">{time}</p>
-        </div>
-      </div>
-      <button 
-        className="text-primary hover:bg-primary/10 p-2 rounded-full transition-colors"
-        title={t('common.more')}
-      >
-        <span className="material-symbols-outlined">more_vert</span>
-      </button>
-    </div>
-  );
-};
