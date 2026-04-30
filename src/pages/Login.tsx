@@ -67,35 +67,35 @@ export const Login = () => {
 
   return (
     <div className="bg-background text-on-background min-h-screen flex items-center justify-center p-4 md:p-8 relative">
-      {/* Language Switcher Top Right */}
-      <div className="absolute top-8 right-8" ref={langMenuRef}>
-        <button 
-          onClick={() => setShowLangMenu(!showLangMenu)}
-          className="bg-surface-container-lowest text-on-surface/70 hover:bg-surface-container-high px-4 py-2 rounded-full border border-outline-variant transition-colors flex items-center gap-2 sunken-shadow"
-        >
-          <span className="material-symbols-outlined text-xl">language</span>
-          <span className="text-sm font-medium">{languages.find(l => i18n.language.startsWith(l.code))?.name || 'Language'}</span>
-        </button>
-        
-        {showLangMenu && (
-          <div className="absolute right-0 mt-2 w-48 bg-surface-container-lowest border border-outline-variant rounded-xl shadow-xl z-50 overflow-hidden py-1">
-            {languages.map((lang) => (
-              <button
-                key={lang.code}
-                onClick={() => changeLanguage(lang.code)}
-                className={`w-full text-left px-4 py-2 text-sm hover:bg-surface-container-high transition-colors flex items-center space-x-3 ${
-                  i18n.language.startsWith(lang.code) ? 'text-primary font-bold bg-primary/5' : 'text-on-surface'
-                }`}
-              >
-                <span className="text-base">{lang.flag}</span>
-                <span>{lang.name}</span>
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
+      <main className="w-full max-w-6xl h-[800px] max-h-[921px] bg-surface-container-lowest rounded-xl flex flex-col md:flex-row overflow-hidden shadow-[0_12px_40px_rgba(11,28,48,0.06)] relative">
+        {/* Language Switcher - Moved inside main for better visibility and relative positioning */}
+        <div className="absolute top-6 right-6 z-[60]" ref={langMenuRef}>
+          <button 
+            onClick={() => setShowLangMenu(!showLangMenu)}
+            className="bg-surface-container-lowest/80 backdrop-blur-sm text-on-surface hover:bg-surface-container-high px-4 py-2 rounded-full border border-outline-variant transition-colors flex items-center gap-2 shadow-sm"
+          >
+            <span className="material-symbols-outlined text-xl">language</span>
+            <span className="text-sm font-medium">{languages.find(l => i18n.language.startsWith(l.code))?.name || 'Language'}</span>
+          </button>
+          
+          {showLangMenu && (
+            <div className="absolute right-0 mt-2 w-48 bg-surface-container-lowest border border-outline-variant rounded-xl shadow-xl z-[70] overflow-hidden py-1">
+              {languages.map((lang) => (
+                <button
+                  key={lang.code}
+                  onClick={() => changeLanguage(lang.code)}
+                  className={`w-full text-left px-4 py-2 text-sm hover:bg-surface-container-high transition-colors flex items-center space-x-3 ${
+                    i18n.language.startsWith(lang.code) ? 'text-primary font-bold bg-primary/5' : 'text-on-surface'
+                  }`}
+                >
+                  <span className="text-base">{lang.flag}</span>
+                  <span>{lang.name}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
 
-      <main className="w-full max-w-6xl h-[800px] max-h-[921px] bg-surface-container-lowest rounded-xl flex flex-col md:flex-row overflow-hidden shadow-[0_12px_40px_rgba(11,28,48,0.06)]">
         <section className="hidden md:block md:w-1/2 relative bg-surface-container">
           <div
             className="absolute inset-0 bg-cover bg-center"
