@@ -18,8 +18,8 @@ export const generatePropertyPDF = async (property: any, amenities: any[], galle
       format: 'a4',
     });
 
-    const gold = [212, 175, 55]; // #D4AF37
-    const black = [0, 0, 0];
+    const gold: [number, number, number] = [212, 175, 55]; // #D4AF37
+    const black: [number, number, number] = [0, 0, 0];
 
     // Helper to add images and handle errors
     const addImageToPDF = (url: string, x: number, y: number, w: number, h: number): Promise<void> => {
@@ -53,9 +53,9 @@ export const generatePropertyPDF = async (property: any, amenities: any[], galle
     };
 
     console.log("Desenhando cabeçalho...");
-    doc.setFillColor(...black);
+    doc.setFillColor(black[0], black[1], black[2]);
     doc.rect(0, 0, 210, 40, 'F');
-    doc.setTextColor(...gold);
+    doc.setTextColor(gold[0], gold[1], gold[2]);
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(22);
     doc.text("Lumis - Inteligência Imobiliária", 15, 20);
@@ -70,7 +70,7 @@ export const generatePropertyPDF = async (property: any, amenities: any[], galle
     }
 
     console.log("Adicionando informações básicas...");
-    doc.setTextColor(...black);
+    doc.setTextColor(black[0], black[1], black[2]);
     doc.setFontSize(24);
     doc.setFont('helvetica', 'bold');
     doc.text(property.title || "Imóvel", 15, 160);
@@ -78,23 +78,23 @@ export const generatePropertyPDF = async (property: any, amenities: any[], galle
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(100, 100, 100);
     doc.text(property.location || "", 15, 168);
-    doc.setTextColor(...gold);
+    doc.setTextColor(gold[0], gold[1], gold[2]);
     doc.setFontSize(18);
     doc.setFont('helvetica', 'bold');
     const priceLabel = property.price_starting_at ? formatCurrency(property.price_starting_at) : "Sob Consulta";
     doc.text(`Valor: ${priceLabel}`, 15, 180);
-    doc.setDrawColor(...gold);
+    doc.setDrawColor(gold[0], gold[1], gold[2]);
     doc.setLineWidth(0.5);
     doc.line(15, 185, 195, 185);
 
     // Stats Table
     console.log("Gerando tabela de atributos...");
-    const stats = [
+    const stats: any[][] = [
       [
-        { content: 'Área', styles: { fontStyle: 'bold' } }, 
-        { content: 'Quartos', styles: { fontStyle: 'bold' } }, 
-        { content: 'Banheiros', styles: { fontStyle: 'bold' } }, 
-        { content: 'Vagas', styles: { fontStyle: 'bold' } }
+        { content: 'Área', styles: { fontStyle: 'bold' as const } }, 
+        { content: 'Quartos', styles: { fontStyle: 'bold' as const } }, 
+        { content: 'Banheiros', styles: { fontStyle: 'bold' as const } }, 
+        { content: 'Vagas', styles: { fontStyle: 'bold' as const } }
       ],
       [
         `${property.sq_ft}m²`,
@@ -109,34 +109,35 @@ export const generatePropertyPDF = async (property: any, amenities: any[], galle
       margin: { left: 15, right: 15 },
       body: stats,
       theme: 'plain',
-      styles: { fontSize: 11, cellPadding: 3, textColor: black as [number, number, number] },
+      styles: { fontSize: 11, cellPadding: 3, textColor: [0, 0, 0] },
     });
 
     // Description
     console.log("Adicionando descrição...");
-    doc.setTextColor(...black);
+    const finalY = (doc as any).lastAutoTable.finalY;
+    doc.setTextColor(black[0], black[1], black[2]);
     doc.setFontSize(14);
     doc.setFont('helvetica', 'bold');
-    doc.text("Descrição", 15, (doc as any).lastAutoTable.finalY + 10);
+    doc.text("Descrição", 15, finalY + 10);
     
     doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(50, 50, 50);
     const splitDescription = doc.splitTextToSize(property.description || "", 180);
-    doc.text(splitDescription, 15, (doc as any).lastAutoTable.finalY + 18);
+    doc.text(splitDescription, 15, finalY + 18);
 
     // New Page for Amenities and Gallery
     if (amenities.length > 0 || gallery.length > 0) {
       console.log("Criando segunda página...");
       doc.addPage();
-      doc.setFillColor(...black);
+      doc.setFillColor(black[0], black[1], black[2]);
       doc.rect(0, 0, 210, 20, 'F');
-      doc.setTextColor(...gold);
+      doc.setTextColor(gold[0], gold[1], gold[2]);
       doc.setFontSize(16);
       doc.text(property.title || "Imóvel", 15, 13);
       let currentY = 35;
       if (amenities.length > 0) {
-        doc.setTextColor(...black);
+        doc.setTextColor(black[0], black[1], black[2]);
         doc.setFontSize(14);
         doc.setFont('helvetica', 'bold');
         doc.text("Diferenciais", 15, currentY);
@@ -148,7 +149,7 @@ export const generatePropertyPDF = async (property: any, amenities: any[], galle
         currentY += (splitAmenities.length * 5) + 20;
       }
       if (gallery.length > 0) {
-        doc.setTextColor(...black);
+        doc.setTextColor(black[0], black[1], black[2]);
         doc.setFontSize(14);
         doc.setFont('helvetica', 'bold');
         doc.text("Galeria", 15, currentY);
@@ -164,12 +165,12 @@ export const generatePropertyPDF = async (property: any, amenities: any[], galle
     }
 
     // Footer
-    const pageCount = doc.internal.getNumberOfPages();
+    const pageCount = doc.getNumberOfPages();
     for(let i = 1; i <= pageCount; i++) {
       doc.setPage(i);
-      doc.setFillColor(...gold);
+      doc.setFillColor(gold[0], gold[1], gold[2]);
       doc.rect(0, 287, 210, 10, 'F');
-      doc.setTextColor(...black);
+      doc.setTextColor(black[0], black[1], black[2]);
       doc.setFontSize(8);
       doc.text(`Gerado em ${new Date().toLocaleDateString()} | Lumis - Inteligência Imobiliária`, 15, 292);
       doc.text(`Página ${i} de ${pageCount}`, 180, 292);
