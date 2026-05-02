@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { supabase } from "../lib/supabase";
 import { Button } from "../components/Button";
-import { ImageUpload } from "../components/ImageUpload";
+import { MediaUpload } from "../components/MediaUpload";
 import { InputField } from "../components/InputField";
 import { developmentSchema, type DevelopmentInput } from "../lib/schemas";
 
@@ -18,7 +18,8 @@ export const NewDevelopment = () => {
   const [builders, setBuilders] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(false);
-  const [galleryImages, setGalleryImages] = useState<string[]>([]);
+  const [galleryMedia, setGalleryMedia] = useState<{url: string, type: 'image' | 'video'}[]>([]);
+  const [showFloorPlan, setShowFloorPlan] = useState(false);
   
   const {
     register,
@@ -32,10 +33,14 @@ export const NewDevelopment = () => {
     defaultValues: {
       status: "available",
       hero_image_url: "",
+      video_url: "",
+      floor_plan_url: "",
     }
   });
 
   const heroImageUrl = watch("hero_image_url");
+  const videoUrl = watch("video_url");
+  const floorPlanUrl = watch("floor_plan_url");
 
   useEffect(() => {
     async function fetchData() {
@@ -63,6 +68,7 @@ export const NewDevelopment = () => {
           
           if (propError) throw propError;
           reset(propData);
+          if (propData.floor_plan_url) setShowFloorPlan(true);
 
           // Fetch gallery
           const { data: galleryData } = await supabase
@@ -72,7 +78,10 @@ export const NewDevelopment = () => {
             .order('display_order', { ascending: true });
           
           if (galleryData) {
-            setGalleryImages(galleryData.map(img => img.url));
+            setGalleryMedia(galleryData.map(item => ({
+              url: item.url,
+              type: item.url.match(/\.(mp4|webm|ogg)$/i) ? 'video' : 'image'
+            })));
           }
         }
       } catch (error) {
@@ -86,12 +95,12 @@ export const NewDevelopment = () => {
     fetchData();
   }, [id, isEditing, reset, navigate, t]);
 
-  const handleAddGalleryImage = (url: string) => {
-    setGalleryImages([...galleryImages, url]);
+  const handleAddGalleryMedia = (url: string, type: 'image' | 'video') => {
+    setGalleryMedia([...galleryMedia, { url, type }]);
   };
 
-  const handleRemoveGalleryImage = (index: number) => {
-    setGalleryImages(galleryImages.filter((_, i) => i !== index));
+  const handleRemoveGalleryMedia = (index: number) => {
+    setGalleryMedia(galleryMedia.filter((_, i) => i !== index));
   };
 
   const onSubmit = async (data: DevelopmentInput) => {
@@ -103,6 +112,7 @@ export const NewDevelopment = () => {
 
       const developmentData = {
         ...data,
+        floor_plan_url: showFloorPlan ? data.floor_plan_url : "",
         user_id: user.id
       };
 
@@ -116,29 +126,28 @@ export const NewDevelopment = () => {
         if (devError) throw devError;
 
         // Refresh gallery: delete all and re-insert
-        // (Simplest way to handle re-ordering and deletions)
         await supabase.from('development_images').delete().eq('development_id', id);
         
-        if (galleryImages.length > 0) {
-          const imageObjects = galleryImages.map((url, index) => ({
+        if (galleryMedia.length > 0) {
+          const mediaObjects = galleryMedia.map((item, index) => ({
             development_id: id,
-            url: url,
+            url: item.url,
             display_order: index
           }));
-          await supabase.from('development_images').insert(imageObjects);
+          await supabase.from('development_images').insert(mediaObjects);
         }
       } else {
         // Create new
         const { data: devData, error: devError } = await supabase.from('developments').insert([developmentData]).select().single();
         if (devError) throw devError;
 
-        if (galleryImages.length > 0) {
-          const imageObjects = galleryImages.map((url, index) => ({
+        if (galleryMedia.length > 0) {
+          const mediaObjects = galleryMedia.map((item, index) => ({
             development_id: devData.id,
-            url: url,
+            url: item.url,
             display_order: index
           }));
-          await supabase.from('development_images').insert(imageObjects);
+          await supabase.from('development_images').insert(mediaObjects);
         }
       }
 
@@ -231,7 +240,7 @@ export const NewDevelopment = () => {
               <InputField label={t('new_development.parking')} type="number" {...register("parking_spaces")} error={errors.parking_spaces?.message} />
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 col-span-1 md:col-span-2 pt-2">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 col-span-1 md:col-span-2 pt-2">
               <label className="flex items-center space-x-3 cursor-pointer group">
                 <input 
                   type="checkbox" 
@@ -258,6 +267,16 @@ export const NewDevelopment = () => {
                 />
                 <span className="font-body text-sm text-on-surface group-hover:text-primary transition-colors">{t('new_development.has_deed')}</span>
               </label>
+
+              <label className="flex items-center space-x-3 cursor-pointer group">
+                <input 
+                  type="checkbox" 
+                  checked={showFloorPlan}
+                  onChange={(e) => setShowFloorPlan(e.target.checked)}
+                  className="w-5 h-5 rounded border-surface-container-highest text-primary focus:ring-primary/20 bg-surface-container-high transition-colors"
+                />
+                <span className="font-body text-sm text-on-surface group-hover:text-primary transition-colors">{t('new_development.has_floor_plan')}</span>
+              </label>
             </div>
 
             <div className="space-y-2 col-span-1 md:col-span-2">
@@ -277,30 +296,57 @@ export const NewDevelopment = () => {
           <h3 className="font-headline text-xl font-bold text-primary border-b border-surface-container-high pb-4">{t('new_development.media_gallery')}</h3>
           
           <div className="space-y-8">
-            <ImageUpload 
+            <MediaUpload 
               label={t('new_development.primary_image')}
               onUpload={(url) => setValue("hero_image_url", url, { shouldValidate: true })}
               previewUrl={heroImageUrl}
+              accept="image"
             />
             {errors.hero_image_url && <p className="text-xs text-error font-medium">{errors.hero_image_url.message}</p>}
+
+            <MediaUpload 
+              label={t('new_development.highlight_video')}
+              onUpload={(url) => setValue("video_url", url, { shouldValidate: true })}
+              previewUrl={videoUrl}
+              accept="video"
+            />
+            {errors.video_url && <p className="text-xs text-error font-medium">{errors.video_url.message}</p>}
+
+            {showFloorPlan && (
+              <MediaUpload 
+                label={t('new_development.floor_plan_label')}
+                onUpload={(url) => setValue("floor_plan_url", url, { shouldValidate: true })}
+                previewUrl={floorPlanUrl}
+                accept="image"
+              />
+            )}
 
             <div className="space-y-4">
               <label className="block font-label text-sm font-medium text-on-surface">{t('new_development.additional_images')}</label>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                {galleryImages.map((url, index) => (
-                  <div key={index} className="relative aspect-video rounded-lg overflow-hidden group">
-                    <img src={url} alt={`Gallery ${index}`} className="w-full h-full object-cover" />
+                {galleryMedia.map((item, index) => (
+                  <div key={index} className="relative aspect-video rounded-lg overflow-hidden group bg-surface-container">
+                    {item.type === 'video' ? (
+                      <video src={item.url} className="w-full h-full object-cover" />
+                    ) : (
+                      <img src={item.url} alt={`Gallery ${index}`} className="w-full h-full object-cover" />
+                    )}
                     <button 
                       type="button" 
-                      onClick={() => handleRemoveGalleryImage(index)}
+                      onClick={() => handleRemoveGalleryMedia(index)}
                       className="absolute top-2 right-2 p-1 bg-error text-on-error rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
                     >
                       <span className="material-symbols-outlined text-sm">close</span>
                     </button>
+                    {item.type === 'video' && (
+                      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                        <span className="material-symbols-outlined text-white/70 text-4xl">play_circle</span>
+                      </div>
+                    )}
                   </div>
                 ))}
-                <ImageUpload 
-                  onUpload={handleAddGalleryImage}
+                <MediaUpload 
+                  onUpload={handleAddGalleryMedia}
                   className="aspect-video"
                 />
               </div>

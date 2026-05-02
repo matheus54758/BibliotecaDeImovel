@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { supabase } from "../lib/supabase";
 import { Button } from "../components/Button";
 import { formatCurrency } from "../lib/utils";
+import { generatePropertyPDF } from "../lib/pdf";
 
 export const PropertyDetails = () => {
   const { t } = useTranslation();
@@ -14,7 +15,7 @@ export const PropertyDetails = () => {
   const [gallery, setGallery] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState(false);
-  const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [selectedMedia, setSelectedMedia] = useState<{url: string, type: 'image' | 'video'} | null>(null);
 
   const handleDelete = async (e: React.MouseEvent) => {
     e.preventDefault();
@@ -99,7 +100,12 @@ export const PropertyDetails = () => {
           .select('*')
           .eq('development_id', id)
           .order('display_order', { ascending: true });
-        setGallery(galleryData || []);
+        
+        const galleryWithTypes = (galleryData || []).map(item => ({
+          ...item,
+          type: item.url.match(/\.(mp4|webm|ogg)$/i) ? 'video' : 'image'
+        }));
+        setGallery(galleryWithTypes);
 
       } catch (error: any) {
         console.error("Erro ao buscar imóvel:", error.message);
@@ -117,26 +123,36 @@ export const PropertyDetails = () => {
   return (
     <div className="max-w-[1920px] mx-auto pb-24">
       {/* Lightbox Overlay */}
-      {selectedImage && (
+      {selectedMedia && (
         <div 
           className="fixed inset-0 z-[100] bg-black/95 backdrop-blur-sm flex items-center justify-center p-4 md:p-12 cursor-pointer"
-          onClick={() => setSelectedImage(null)}
+          onClick={() => setSelectedMedia(null)}
         >
           <button 
             className="absolute top-8 right-8 text-white/70 hover:text-white p-2 rounded-full transition-colors bg-white/10 hover:bg-white/20 z-10"
-            onClick={(e) => { e.stopPropagation(); setSelectedImage(null); }}
+            onClick={(e) => { e.stopPropagation(); setSelectedMedia(null); }}
           >
             <span className="material-symbols-outlined text-3xl">close</span>
           </button>
-          <img 
-            src={selectedImage} 
-            className="max-w-full max-h-full object-contain rounded-lg shadow-2xl animate-in zoom-in duration-300"
-            alt="Full view"
-          />
+          {selectedMedia.type === 'video' ? (
+            <video 
+              src={selectedMedia.url} 
+              className="max-w-full max-h-full rounded-lg shadow-2xl animate-in zoom-in duration-300"
+              controls
+              autoPlay
+              onClick={(e) => e.stopPropagation()}
+            />
+          ) : (
+            <img 
+              src={selectedMedia.url} 
+              className="max-w-full max-h-full object-contain rounded-lg shadow-2xl animate-in zoom-in duration-300"
+              alt="Full view"
+            />
+          )}
         </div>
       )}
 
-      <nav className="py-6 text-sm text-on-surface-variant font-body flex justify-between items-center">
+      <nav className="py-6 text-sm text-on-surface-variant font-body flex justify-between items-center px-4">
         <ol className="flex items-center gap-2">
           <li><button onClick={() => navigate('/developments')} className="hover:text-primary transition-colors">{t('nav.developments')}</button></li>
           <li><span className="material-symbols-outlined text-sm">chevron_right</span></li>
@@ -166,12 +182,12 @@ export const PropertyDetails = () => {
         </div>
       </nav>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 px-4">
         <div className="lg:col-span-8 space-y-12">
           <div className="space-y-4">
             <div 
               className="relative h-[614px] min-h-[500px] w-full bg-surface-container-low rounded-xl overflow-hidden group cursor-zoom-in"
-              onClick={() => setSelectedImage(property.hero_image_url || "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?q=80&w=2070&auto=format&fit=crop")}
+              onClick={() => setSelectedMedia({ url: property.hero_image_url || "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?q=80&w=2070&auto=format&fit=crop", type: 'image' })}
             >
               <img
                 src={property.hero_image_url || "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?q=80&w=2070&auto=format&fit=crop"}
@@ -185,30 +201,62 @@ export const PropertyDetails = () => {
               </div>
             </div>
 
-            {gallery.length > 0 && (
-              <div className="grid grid-cols-3 gap-4">
-                {gallery.slice(0, 3).map((img, idx) => (
-                  <div 
-                    key={img.id} 
-                    className="h-48 rounded-lg overflow-hidden bg-surface-container-low cursor-zoom-in group relative"
-                    onClick={() => setSelectedImage(img.url)}
-                  >
-                    <img 
-                      src={img.url} 
-                      className={`w-full h-full object-cover transition-transform duration-500 group-hover:scale-110 ${idx === 2 && gallery.length > 3 ? 'opacity-80' : ''}`} 
-                    />
-                    {idx === 2 && gallery.length > 3 && (
-                      <div className="absolute inset-0 flex items-center justify-center bg-primary/20 backdrop-blur-sm">
-                        <span className="text-on-primary font-medium flex items-center gap-2">
-                          <span className="material-symbols-outlined">collections</span>
-                          +{gallery.length - 3} More
-                        </span>
-                      </div>
-                    )}
+            <div className="grid grid-cols-3 gap-4">
+              {/* Featured Video if exists */}
+              {property.video_url && (
+                <div 
+                  className="h-48 rounded-lg overflow-hidden bg-surface-container-low cursor-pointer group relative"
+                  onClick={() => setSelectedMedia({ url: property.video_url, type: 'video' })}
+                >
+                  <video src={property.video_url} className="w-full h-full object-cover" />
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/20 group-hover:bg-black/40 transition-colors">
+                    <span className="material-symbols-outlined text-white text-5xl">play_circle</span>
                   </div>
-                ))}
-              </div>
-            )}
+                  <div className="absolute bottom-2 left-2 bg-black/60 text-white text-[10px] px-2 py-0.5 rounded uppercase font-bold tracking-widest">Highlight Video</div>
+                </div>
+              )}
+
+              {/* Floor Plan if exists */}
+              {property.floor_plan_url && (
+                <div 
+                  className="h-48 rounded-lg overflow-hidden bg-surface-container-low cursor-zoom-in group relative"
+                  onClick={() => setSelectedMedia({ url: property.floor_plan_url, type: 'image' })}
+                >
+                  <img src={property.floor_plan_url} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
+                  <div className="absolute bottom-2 left-2 bg-primary/80 text-on-primary text-[10px] px-2 py-0.5 rounded uppercase font-bold tracking-widest">{t('new_development.floor_plan_label')}</div>
+                </div>
+              )}
+
+              {gallery.slice(0, property.video_url && property.floor_plan_url ? 1 : (property.video_url || property.floor_plan_url ? 2 : 3)).map((item, idx) => (
+                <div 
+                  key={item.id} 
+                  className="h-48 rounded-lg overflow-hidden bg-surface-container-low cursor-zoom-in group relative"
+                  onClick={() => setSelectedMedia({ url: item.url, type: item.type })}
+                >
+                  {item.type === 'video' ? (
+                    <video src={item.url} className="w-full h-full object-cover" />
+                  ) : (
+                    <img 
+                      src={item.url} 
+                      className={`w-full h-full object-cover transition-transform duration-500 group-hover:scale-110`} 
+                    />
+                  )}
+                  {item.type === 'video' && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/10 group-hover:bg-black/30 transition-colors">
+                      <span className="material-symbols-outlined text-white text-4xl">play_circle</span>
+                    </div>
+                  )}
+                  {idx === (property.video_url && property.floor_plan_url ? 0 : (property.video_url || property.floor_plan_url ? 1 : 2)) && gallery.length > (property.video_url && property.floor_plan_url ? 1 : (property.video_url || property.floor_plan_url ? 2 : 3)) && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-primary/20 backdrop-blur-sm">
+                      <span className="text-on-primary font-medium flex items-center gap-2">
+                        <span className="material-symbols-outlined">collections</span>
+                        +{gallery.length - (property.video_url && property.floor_plan_url ? 1 : (property.video_url || property.floor_plan_url ? 2 : 3))} More
+                      </span>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
 
           <section className="bg-surface-container-lowest p-8 lg:p-12 rounded-xl sunken-shadow">
@@ -284,9 +332,17 @@ export const PropertyDetails = () => {
                 )}
                 <div className="space-y-4">
                   <Button className="w-full py-4 text-lg font-bold flex items-center justify-center gap-2">
-                    Request More Info
+                    {t('common.request_info')}
                     <span className="material-symbols-outlined">arrow_forward</span>
                   </Button>
+                  
+                  <button 
+                    onClick={() => generatePropertyPDF(property, amenities, gallery)}
+                    className="w-full py-3 border-2 border-primary text-primary hover:bg-primary hover:text-on-primary transition-all rounded-md font-bold flex items-center justify-center gap-2"
+                  >
+                    <span className="material-symbols-outlined">download</span>
+                    {t('common.download_pdf')}
+                  </button>
                 </div>
               </div>
               

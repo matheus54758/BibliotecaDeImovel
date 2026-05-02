@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { supabase } from "../lib/supabase";
 import { Button } from "../components/Button";
-import { ImageUpload } from "../components/ImageUpload";
+import { MediaUpload } from "../components/MediaUpload";
 import { InputField } from "../components/InputField";
 import { builderSchema, type BuilderInput } from "../lib/schemas";
 
@@ -123,10 +123,11 @@ export const RegisterBuilder = () => {
                 {t('new_development.core_details')}
               </h3>
               
-              <ImageUpload 
-                label="Logo"
+              <MediaUpload 
+                label={t('builders.form.logo')}
                 onUpload={(url) => setValue("logo_url", url, { shouldValidate: true })}
                 previewUrl={logoUrl}
+                accept="image"
               />
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

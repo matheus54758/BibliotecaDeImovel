@@ -18,7 +18,7 @@ const resources = {
         "analytics": "Analytics",
         "settings": "Settings",
         "new_development": "New Property",
-        "ledger": "Property Library",
+        "ledger": "Lumis - Inteligência Imobiliária",
         "consultant_pro": "Consultant Pro"
       },
       "common": {
@@ -43,6 +43,7 @@ const resources = {
         "delete_error": "Error deleting. Please try again.",
         "load_error": "Failed to load data.",
         "request_info": "Request More Info",
+        "download_pdf": "PDF Download",
         "exclusive": "Exclusive Mandate"
       },
       "dashboard": {
@@ -77,6 +78,9 @@ const resources = {
         "beds": "Beds",
         "baths": "Baths",
         "amenities": "Premium Amenities",
+        "garage_title": "Garage",
+        "beach_title": "Near the Beach",
+        "deed_title": "Deed",
         "about": "About this property"
       },
       "builders": {
@@ -121,10 +125,13 @@ const resources = {
         "has_garage": "Has garage?",
         "near_beach": "Near the beach?",
         "has_deed": "Has deed?",
+        "has_floor_plan": "Has floor plan?",
+        "floor_plan_label": "Floor Plan",
         "description": "Description",
         "description_placeholder": "Describe the architectural highlights...",
         "media_gallery": "Media Gallery",
         "primary_image": "Primary Hero Image",
+        "highlight_video": "Highlight Video",
         "additional_images": "Additional Gallery Photos"
       },
       "status": {
@@ -134,7 +141,7 @@ const resources = {
         "unavailable": "Unavailable"
       },
       "login": {
-        "title": "Property Library",
+        "title": "Lumis - Inteligência Imobiliária",
         "subtitle": "Store all information about partner builders and properties so they are in the palm of your hand.",
         "welcome": "Welcome back",
         "enter_details": "Please enter your details to sign in.",
@@ -180,7 +187,7 @@ const resources = {
         "analytics": "Análise",
         "settings": "Configurações",
         "new_development": "Novo Imóvel",
-        "ledger": "Biblioteca do Imóvel",
+        "ledger": "Lumis - Inteligência Imobiliária",
         "consultant_pro": "Consultor Pro"
       },
       "common": {
@@ -205,6 +212,7 @@ const resources = {
         "delete_error": "Erro ao excluir. Tente novamente.",
         "load_error": "Falha ao carregar dados.",
         "request_info": "Solicitar Informações",
+        "download_pdf": "PDF Download",
         "exclusive": "Mandato Exclusivo"
       },
       "dashboard": {
@@ -288,10 +296,13 @@ const resources = {
         "has_garage": "Há garagem?",
         "near_beach": "Perto da praia?",
         "has_deed": "Tem escritura?",
+        "has_floor_plan": "Há planta do imóvel?",
+        "floor_plan_label": "Planta do Imóvel",
         "description": "Descrição",
         "description_placeholder": "Descreva os destaques arquitetônicos...",
         "media_gallery": "Galeria de Mídia",
         "primary_image": "Imagem Principal",
+        "highlight_video": "Vídeo de Destaque",
         "additional_images": "Fotos Adicionais da Galeria"
       },
       "status": {
@@ -301,7 +312,7 @@ const resources = {
         "unavailable": "Indisponível"
       },
       "login": {
-        "title": "Biblioteca de Imóveis",
+        "title": "Lumis - Inteligência Imobiliária",
         "subtitle": "Armazane todas as informações sobre construtoras parceiras e imóveis para que estejam na palma da sua mão.",
         "welcome": "Bem-vindo de volta",
         "enter_details": "Por favor, insira seus dados para entrar.",
@@ -336,7 +347,7 @@ const resources = {
     translation: {
       "search_placeholder": "Buscar propiedades, clientes...",
       "notifications": "Notificaciones",
-      "messages": "Mensajes",
+      "messages": "Messages",
       "profile": "Perfil",
       "language": "Idioma",
       "nav": {
@@ -347,7 +358,7 @@ const resources = {
         "analytics": "Análisis",
         "settings": "Configuración",
         "new_development": "Nuevo Inmueble",
-        "ledger": "Biblioteca de Inmuebles",
+        "ledger": "Lumis - Inteligência Imobiliária",
         "consultant_pro": "Consultor Pro"
       },
       "common": {
@@ -372,6 +383,7 @@ const resources = {
         "delete_error": "Error al eliminar. Inténtalo de novo.",
         "load_error": "Error al cargar los datos.",
         "request_info": "Solicitar Información",
+        "download_pdf": "PDF Download",
         "exclusive": "Mandato Exclusivo"
       },
       "dashboard": {
@@ -399,13 +411,16 @@ const resources = {
         "title_builder": "Constructora",
         "title_suffix": "Premium",
         "subtitle_all": "Portafolio curado de activos arquitectónicos de alto rendimiento. Enfoque en precisión, ubicación y creación de valor a largo prazo.",
-        "subtitle_builder": "Exhibiendo el portafolio exclusivo de activos arquitectónicos para este socio.",
+        "subtitle_builder": "Exhibiendo el portafolio exclusivo de activos arquitetónicos para este socio.",
         "new_asset": "Nuevo Inmueble",
         "loading": "Cargando portafolio de desarrollos...",
         "no_developments": "No se encontraron desarrollos.",
         "beds": "Habitaciones",
         "baths": "Baños",
         "amenities": "Comodidades Premium",
+        "garage_title": "Garaje",
+        "beach_title": "Cerca de la Playa",
+        "deed_title": "Escritura",
         "about": "Sobre esta propiedad"
       },
       "builders": {
@@ -434,7 +449,7 @@ const resources = {
       "new_development": {
         "title": "Nuevo Desarrollo",
         "edit_title": "Editar Desarrollo",
-        "subtitle": "Introduzca un nuevo activo premium al catálogo.",
+        "subtitle": "Introduzca un novo activo premium al catálogo.",
         "edit_subtitle": "Actualice los detalles de este activo arquitectónico.",
         "core_details": "Detalles Principales",
         "partner": "Socio de Construcción",
@@ -447,10 +462,16 @@ const resources = {
         "beds": "Habitaciones",
         "baths": "Baños",
         "parking": "Plazas",
+        "has_garage": "¿Tiene garaje?",
+        "near_beach": "¿Cerca de la playa?",
+        "has_deed": "¿Tiene escritura?",
+        "has_floor_plan": "¿Tiene plano del inmueble?",
+        "floor_plan_label": "Plano del Inmueble",
         "description": "Descripción",
         "description_placeholder": "Describa los aspectos arquitectónicos más destacados...",
         "media_gallery": "Galería de Medios",
         "primary_image": "Imagen Principal",
+        "highlight_video": "Video de Destacado",
         "additional_images": "Fotos Adicionales de la Galería"
       },
       "status": {
@@ -459,7 +480,7 @@ const resources = {
         "under_construction": "En Construcción"
       },
       "login": {
-        "title": "Biblioteca de Inmuebles",
+        "title": "Lumis - Inteligência Imobiliária",
         "subtitle": "Almacene toda la información sobre constructoras asociadas e inmuebles para que estén en la palma de su mano.",
         "welcome": "Bienvenido de nuevo",
         "enter_details": "Por favor, introduzca sus datos para iniciar sesión.",
@@ -473,10 +494,10 @@ const resources = {
         "request_access": "Solicitar acceso"
       },
       "consultancy": {
-        "subtitle": "Encuentre el inmueble ideal filtrando por características y valor.",
+        "subtitle": "Encuentre el inmueble ideal filtrando por características e valor.",
         "max_price": "Valor Máximo (R$)",
         "features": "Características (Tags)",
-        "clear_filters": "Limpiar Filtros",
+        "clear_filters": "Limpar Filtros",
         "no_results": "No se encontraron inmuebles com estos filtros."
       },
       "specialization": {

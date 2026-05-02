@@ -101,7 +101,7 @@ export const Login = () => {
             className="absolute inset-0 bg-cover bg-center"
             style={{
               backgroundImage:
-                "url('https://lh3.googleusercontent.com/aida-public/AB6AXuD7HdK0Ds-_ZYLiSvsC4XZEXuH-Uv3o2D_MrnY2VolDZOZzoJIp1zgsnAOjHcTemDpjsbvY62VSnl7ItK9xdMBSuQucM1xlHNASGHYhQ5goDAIcqQRkhPRA8hzO_VvyZBQQKmffHBAdBa1BwUxw-EeFHklqnQJsvtGHa7s5KMm64a79T_RfLawrQ-v9aTKORedSZNmTgmYIPv67TWvDwJDUHzqHEC-bwBZQ8LCT7taH14ghFqNfifAV58lA-tPR-cSKe3A-3cAcX8ri')",
+                "url('https://i.imgur.com/cfSyLhK.jpeg')",
             }}
           ></div>
           <div className="absolute bottom-12 left-12 right-12 glass-panel p-8 rounded-lg">
