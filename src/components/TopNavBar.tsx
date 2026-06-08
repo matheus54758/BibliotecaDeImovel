@@ -3,10 +3,12 @@ import { useState, useRef, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useNavigate, NavLink, Link } from 'react-router-dom';
 import { cn } from '../lib/utils';
+import { useUserTier } from '../hooks/useUserTier';
 
 export const TopNavBar = () => {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
+  const { tier, subscriptionDates } = useUserTier();
   const [showLangMenu, setShowLangMenu] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
@@ -35,6 +37,18 @@ export const TopNavBar = () => {
   const handleLogout = async () => {
     await supabase.auth.signOut();
     navigate('/login');
+  };
+
+  const handleManageSubscription = async () => {
+    try {
+      const { data, error } = await supabase.functions.invoke('create-portal-session');
+
+      if (error) throw error;
+      if (data?.url) window.location.href = data.url;
+    } catch (error) {
+      console.error("Error creating portal session:", error);
+      alert("Falha ao abrir portal de gerenciamento.");
+    }
   };
 
   useEffect(() => {
@@ -126,10 +140,43 @@ export const TopNavBar = () => {
             </div>
 
             {showUserMenu && (
-              <div className="absolute right-0 mt-2 w-48 bg-surface-container-lowest border border-outline-variant rounded-xl shadow-xl z-50 overflow-hidden py-1">
+              <div className="absolute right-0 mt-2 w-64 bg-surface-container-lowest border border-outline-variant rounded-xl shadow-xl z-50 overflow-hidden py-1">
+                {tier === 'paid' && (
+                  <div className="px-4 py-3 border-b border-surface-container-highest bg-primary/5">
+                    <div className="flex items-center gap-2 text-primary mb-3">
+                      <span className="material-symbols-outlined text-lg">workspace_premium</span>
+                      <span className="text-xs font-bold uppercase tracking-wider">Assinatura Premium</span>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex flex-col">
+                        <span className="text-[10px] text-on-surface/50 uppercase font-bold tracking-tight">Data de Assinatura</span>
+                        <span className="text-sm font-medium text-on-surface">
+                          {subscriptionDates.start ? new Date(subscriptionDates.start).toLocaleDateString() : '---'}
+                        </span>
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-[10px] text-on-surface/50 uppercase font-bold tracking-tight">Vencimento</span>
+                        <span className="text-sm font-medium text-on-surface">
+                          {subscriptionDates.end ? new Date(subscriptionDates.end).toLocaleDateString() : '---'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                
+                {tier === 'paid' && (
+                  <button
+                    onClick={handleManageSubscription}
+                    className="w-full text-left px-4 py-3 text-sm text-on-surface hover:bg-surface-container-high transition-colors flex items-center space-x-3 border-b border-surface-container-highest"
+                  >
+                    <span className="material-symbols-outlined text-lg text-primary">settings_suggest</span>
+                    <span>Gerenciar Assinatura</span>
+                  </button>
+                )}
+                
                 <button
                   onClick={handleLogout}
-                  className="w-full text-left px-4 py-2 text-sm text-error hover:bg-error/5 transition-colors flex items-center space-x-3"
+                  className="w-full text-left px-4 py-3 text-sm text-error hover:bg-error/5 transition-colors flex items-center space-x-3"
                 >
                   <span className="material-symbols-outlined text-lg">logout</span>
                   <span>Sair da conta</span>

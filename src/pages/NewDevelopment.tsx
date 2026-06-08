@@ -8,12 +8,14 @@ import { Button } from "../components/Button";
 import { MediaUpload } from "../components/MediaUpload";
 import { InputField } from "../components/InputField";
 import { developmentSchema, type DevelopmentInput } from "../lib/schemas";
+import { useUserTier } from "../hooks/useUserTier";
 
 export const NewDevelopment = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { id } = useParams();
   const isEditing = Boolean(id);
+  const { canAddDevelopment } = useUserTier();
   
   const [builders, setBuilders] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -104,6 +106,11 @@ export const NewDevelopment = () => {
   };
 
   const onSubmit = async (data: DevelopmentInput) => {
+    if (!isEditing && !canAddDevelopment) {
+      alert(t('freemium.development_limit_desc'));
+      return;
+    }
+
     setLoading(true);
 
     try {

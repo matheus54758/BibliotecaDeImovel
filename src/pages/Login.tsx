@@ -12,6 +12,8 @@ export const Login = () => {
   const { t, i18n } = useTranslation();
   const [loading, setLoading] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
+  const [authMessage, setAuthMessage] = useState<string | null>(null);
+  const [isSignUp, setIsSignUp] = useState(false);
   const [showLangMenu, setShowLangMenu] = useState(false);
   const langMenuRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
@@ -41,6 +43,7 @@ export const Login = () => {
     register,
     handleSubmit,
     formState: { errors },
+    reset
   } = useForm<LoginInput>({
     resolver: zodResolver(loginSchema),
   });
@@ -48,18 +51,40 @@ export const Login = () => {
   const onSubmit = async (data: LoginInput) => {
     setLoading(true);
     setAuthError(null);
+    setAuthMessage(null);
 
     try {
-      const { error: signInError } = await supabase.auth.signInWithPassword({
-        email: data.email,
-        password: data.password,
-      });
+      if (isSignUp) {
+        const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+          email: data.email,
+          password: data.password,
+          options: {
+            data: {
+              tier: 'free'
+            }
+          }
+        });
 
-      if (signInError) throw signInError;
+        if (signUpError) throw signUpError;
+        
+        if (signUpData.session) {
+          navigate("/");
+        } else {
+          setAuthMessage("Cadastro realizado! Verifique seu e-mail para confirmar a conta.");
+          setIsSignUp(false);
+          reset();
+        }
+      } else {
+        const { error: signInError } = await supabase.auth.signInWithPassword({
+          email: data.email,
+          password: data.password,
+        });
 
-      navigate("/");
+        if (signInError) throw signInError;
+        navigate("/");
+      }
     } catch (err: any) {
-      setAuthError(err.message || "An error occurred during sign in");
+      setAuthError(err.message || "Ocorreu um erro durante a autenticação");
     } finally {
       setLoading(false);
     }
@@ -68,7 +93,6 @@ export const Login = () => {
   return (
     <div className="bg-background text-on-background min-h-screen flex items-center justify-center p-4 md:p-8 relative">
       <main className="w-full max-w-6xl h-[800px] max-h-[921px] bg-surface-container-lowest rounded-xl flex flex-col md:flex-row overflow-hidden shadow-[0_12px_40px_rgba(11,28,48,0.06)] relative">
-        {/* Language Switcher - Moved inside main for better visibility and relative positioning */}
         <div className="absolute top-6 right-6 z-[60]" ref={langMenuRef}>
           <button 
             onClick={() => setShowLangMenu(!showLangMenu)}
@@ -98,18 +122,19 @@ export const Login = () => {
 
         <section className="hidden md:block md:w-1/2 relative bg-surface-container">
           <div
-            className="absolute inset-0 bg-cover bg-center"
+            className="absolute inset-0 bg-cover bg-center transition-all duration-700"
             style={{
-              backgroundImage:
-                "url('https://i.imgur.com/cfSyLhK.jpeg')",
+              backgroundImage: isSignUp 
+                ? "url('https://images.unsplash.com/photo-1448630360428-65ff2653a530?q=80&w=2070&auto=format&fit=crop')"
+                : "url('https://i.imgur.com/cfSyLhK.jpeg')",
             }}
           ></div>
           <div className="absolute bottom-12 left-12 right-12 glass-panel p-8 rounded-lg">
             <h2 className="font-headline font-bold text-3xl text-on-surface mb-2 tracking-tight">
-              {t('login.title')}
+              {isSignUp ? "Crie sua conta" : t('login.title')}
             </h2>
             <p className="font-body text-on-surface-variant text-sm leading-relaxed">
-              {t('login.subtitle')}
+              {isSignUp ? "Junte-se ao The Architectural Ledger e comece a gerenciar seus ativos hoje mesmo." : t('login.subtitle')}
             </p>
           </div>
         </section>
@@ -121,15 +146,24 @@ export const Login = () => {
           <div className="max-w-md w-full mx-auto">
             <div className="mb-10">
               <h1 className="font-headline font-extrabold text-4xl text-on-background mb-3 tracking-[-0.02em]">
-                {t('login.welcome')}
+                {isSignUp ? "Cadastrar" : t('login.welcome')}
               </h1>
-              <p className="font-body text-on-surface-variant text-base">{t('login.enter_details')}</p>
+              <p className="font-body text-on-surface-variant text-base">
+                {isSignUp ? "Preencha os dados para criar seu acesso." : t('login.enter_details')}
+              </p>
             </div>
 
             {authError && (
               <div className="mb-6 p-4 bg-error-container text-on-error-container rounded-lg text-sm font-medium flex items-center gap-2">
                 <span className="material-symbols-outlined">warning</span>
                 {authError}
+              </div>
+            )}
+
+            {authMessage && (
+              <div className="mb-6 p-4 bg-primary/10 text-primary rounded-lg text-sm font-medium flex items-center gap-2 border border-primary/20">
+                <span className="material-symbols-outlined">check_circle</span>
+                {authMessage}
               </div>
             )}
 
@@ -152,35 +186,48 @@ export const Login = () => {
                 error={errors.password?.message}
               />
 
-              <div className="flex items-center justify-between pt-2">
-                <div className="flex items-center">
-                  <input
-                    className="h-4 w-4 text-primary bg-surface-container-high border-0 rounded focus:ring-primary focus:ring-offset-background"
-                    id="remember-me"
-                    type="checkbox"
-                  />
-                  <label className="ml-3 block text-sm font-body text-on-surface-variant" htmlFor="remember-me">
-                    {t('login.remember')}
-                  </label>
+              {!isSignUp && (
+                <div className="flex items-center justify-between pt-2">
+                  <div className="flex items-center">
+                    <input
+                      className="h-4 w-4 text-primary bg-surface-container-high border-0 rounded focus:ring-primary focus:ring-offset-background"
+                      id="remember-me"
+                      type="checkbox"
+                    />
+                    <label className="ml-3 block text-sm font-body text-on-surface-variant" htmlFor="remember-me">
+                      {t('login.remember')}
+                    </label>
+                  </div>
+                  <div className="text-sm">
+                    <a className="font-body font-medium text-primary hover:text-primary-container transition-colors" href="#">
+                      {t('login.forgot')}
+                    </a>
+                  </div>
                 </div>
-                <div className="text-sm">
-                  <a className="font-body font-medium text-primary hover:text-primary-container transition-colors" href="#">
-                    {t('login.forgot')}
-                  </a>
-                </div>
-              </div>
+              )}
               
               <div className="pt-4">
-                <Button className="w-full py-4 text-base font-bold" type="submit" disabled={loading}>
-                  {loading ? t('login.signing_in') : t('login.sign_in')}
+                <Button className="w-full py-4 text-base font-bold shadow-lg shadow-primary/20" type="submit" disabled={loading}>
+                  {loading 
+                    ? (isSignUp ? "Criando conta..." : t('login.signing_in')) 
+                    : (isSignUp ? "Criar conta gratuita" : t('login.sign_in'))
+                  }
                 </Button>
               </div>
             </form>
+
             <div className="mt-8 text-center text-sm font-body text-on-surface-variant">
-              {t('login.no_account')}{" "}
-              <a className="font-medium text-primary hover:text-primary-container transition-colors" href="#">
-                {t('login.request_access')}
-              </a>
+              {isSignUp ? "Já tem uma conta?" : t('login.no_account')}{" "}
+              <button 
+                onClick={() => {
+                  setIsSignUp(!isSignUp);
+                  setAuthError(null);
+                  setAuthMessage(null);
+                }}
+                className="font-medium text-primary hover:text-primary-container transition-colors underline underline-offset-4"
+              >
+                {isSignUp ? "Entrar agora" : "Cadastre-se aqui"}
+              </button>
             </div>
           </div>
         </section>

@@ -8,6 +8,7 @@ import { Button } from "../components/Button";
 import { MediaUpload } from "../components/MediaUpload";
 import { InputField } from "../components/InputField";
 import { builderSchema, type BuilderInput } from "../lib/schemas";
+import { useUserTier } from "../hooks/useUserTier";
 
 export const RegisterBuilder = () => {
   const { t } = useTranslation();
@@ -16,6 +17,7 @@ export const RegisterBuilder = () => {
   const navigate = useNavigate();
   const { id } = useParams();
   const isEditing = Boolean(id);
+  const { canAddBuilder } = useUserTier();
 
   const {
     register,
@@ -59,6 +61,11 @@ export const RegisterBuilder = () => {
   }, [id, isEditing, reset, navigate, t]);
 
   const onSubmit = async (data: BuilderInput) => {
+    if (!isEditing && !canAddBuilder) {
+      alert(t('freemium.builder_limit_desc'));
+      return;
+    }
+
     setLoading(true);
 
     try {

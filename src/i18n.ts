@@ -169,6 +169,12 @@ const resources = {
         "urban_renewal": "Urban Renewal",
         "infrastructure": "Infrastructure",
         "renovation": "Renovation & Restoration"
+      },
+      "freemium": {
+        "limit_reached": "Limit Reached",
+        "builder_limit_desc": "Free users can only add up to 10 builders. Upgrade to a paid plan for unlimited access.",
+        "development_limit_desc": "Free users can only add up to 10 properties. Upgrade to a paid plan for unlimited access.",
+        "upgrade_now": "Upgrade Now"
       }
     }
   },
@@ -340,6 +346,12 @@ const resources = {
         "urban_renewal": "Renovação Urbana",
         "infrastructure": "Infraestrutura",
         "renovation": "Reforma e Restauração"
+      },
+      "freemium": {
+        "limit_reached": "Limite Atingido",
+        "builder_limit_desc": "Usuários gratuitos podem adicionar até 10 construtoras. Faça upgrade para o plano pago para acesso ilimitado.",
+        "development_limit_desc": "Usuários gratuitos podem adicionar até 10 imóveis. Faça upgrade para o plano pago para acesso ilimitado.",
+        "upgrade_now": "Fazer Upgrade Agora"
       }
     }
   },
@@ -508,6 +520,12 @@ const resources = {
         "urban_renewal": "Renovación Urbana",
         "infrastructure": "Infraestructura",
         "renovation": "Reforma y Restauración"
+      },
+      "freemium": {
+        "limit_reached": "Límite Alcanzado",
+        "builder_limit_desc": "Los usuarios gratuitos solo pueden añadir hasta 10 constructoras. Actualice a un plan de pago para acceso ilimitado.",
+        "development_limit_desc": "Los usuarios gratuitos solo pueden añadir hasta 10 inmuebles. Actualice a un plan de pago para acceso ilimitado.",
+        "upgrade_now": "Actualizar Ahora"
       }
     }
   }

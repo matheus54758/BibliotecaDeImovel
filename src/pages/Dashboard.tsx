@@ -1,45 +1,44 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { supabase } from "../lib/supabase";
+import { useUserTier } from "../hooks/useUserTier";
 
 export const Dashboard = () => {
   const { t } = useTranslation();
-  const [metrics, setMetrics] = useState({ builders: 0, projects: 0, leads: 0 });
-  const [activities, setActivities] = useState<any[]>([]);
+  const { tier, counts, loading: tierLoading } = useUserTier();
+  const [activities] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showPricing, setShowPricing] = useState(false);
 
   useEffect(() => {
-    async function fetchDashboardData() {
-      try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
-
-        // Fetch counts filtered by user_id
-        const { count: builderCount } = await supabase
-          .from('builders')
-          .select('*', { count: 'exact', head: true })
-          .eq('user_id', user.id);
-
-        const { count: projectCount } = await supabase
-          .from('developments')
-          .select('*', { count: 'exact', head: true })
-          .eq('user_id', user.id);
-        
-        setMetrics({
-          builders: builderCount || 0,
-          projects: projectCount || 0,
-          leads: 0, // Placeholder
-        });
-        setActivities([]);
-      } catch (error) {
-        console.error("Error fetching dashboard data:", error);
-      } finally {
-        setLoading(false);
-      }
+    // Only set loading false when both dashboard and tier data are ready
+    if (!tierLoading) {
+      setLoading(false);
     }
+  }, [tierLoading]);
 
-    fetchDashboardData();
-  }, []);
+  const handleUpgrade = async (priceId: string) => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-checkout`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ priceId })
+      });
+
+      const { url, error } = await response.json();
+      if (error) throw new Error(error);
+      if (url) window.location.href = url;
+    } catch (error) {
+      console.error("Error creating checkout session:", error);
+      alert("Falha ao iniciar processo de pagamento.");
+    }
+  };
 
   if (loading) {
     return <div className="p-8 text-on-surface/50 font-body">{t('dashboard.updating')}</div>;
@@ -47,19 +46,106 @@ export const Dashboard = () => {
 
   return (
     <>
-      <div className="mb-12">
-        <h2 className="text-4xl font-headline font-bold text-on-surface tracking-tight mb-2">
-          {t('dashboard.title')}
-        </h2>
-        <p className="text-on-surface/70 font-body text-lg">
-          {t('dashboard.subtitle')}
-        </p>
+      {showPricing && (
+        <div className="fixed inset-0 bg-on-surface/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+          <div className="bg-surface-container-lowest rounded-2xl p-8 max-w-4xl w-full sunken-shadow relative">
+            <button 
+              onClick={() => setShowPricing(false)}
+              className="absolute top-6 right-6 text-on-surface-variant hover:text-on-surface"
+            >
+              <span className="material-symbols-outlined">close</span>
+            </button>
+            
+            <h2 className="text-3xl font-headline font-bold text-center mb-4">Escolha seu Plano</h2>
+            <p className="text-on-surface-variant text-center mb-12">Libere todo o potencial do Lumis com nossos planos premium.</p>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              {/* Plano Mensal */}
+              <div className="bg-surface-container-low p-8 rounded-xl border border-surface-container-high flex flex-col h-full">
+                <h3 className="text-xl font-headline font-bold mb-2">Plano Mensal</h3>
+                <p className="text-3xl font-headline font-black text-primary mb-6">R$ 39,90<span className="text-sm font-normal text-on-surface-variant">/mês</span></p>
+                <ul className="space-y-4 mb-8 flex-1">
+                  <li className="flex items-center gap-2 text-sm">
+                    <span className="material-symbols-outlined text-primary">check_circle</span>
+                    Construtoras Ilimitadas
+                  </li>
+                  <li className="flex items-center gap-2 text-sm">
+                    <span className="material-symbols-outlined text-primary">check_circle</span>
+                    Imóveis Ilimitados
+                  </li>
+                  <li className="flex items-center gap-2 text-sm">
+                    <span className="material-symbols-outlined text-primary">check_circle</span>
+                    Flexibilidade para cancelar
+                  </li>
+                </ul>
+                <button 
+                  onClick={() => handleUpgrade('price_1TcE0jII9Ml3L1z01fvzbffM')}
+                  className="w-full bg-primary text-on-primary py-3 rounded-lg font-bold hover:opacity-90 transition-opacity"
+                >
+                  Assinar Mensal
+                </button>
+              </div>
+
+              {/* Plano Anual */}
+              <div className="bg-primary/5 p-8 rounded-xl border-2 border-primary flex flex-col h-full relative">
+                <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-primary text-on-primary text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-widest">Melhor Valor</div>
+                <h3 className="text-xl font-headline font-bold mb-2">Plano Anual</h3>
+                <p className="text-3xl font-headline font-black text-primary mb-6">R$ 399,90<span className="text-sm font-normal text-on-surface-variant">/ano</span></p>
+                <ul className="space-y-4 mb-8 flex-1">
+                  <li className="flex items-center gap-2 text-sm">
+                    <span className="material-symbols-outlined text-primary">check_circle</span>
+                    Economia de 2 meses
+                  </li>
+                  <li className="flex items-center gap-2 text-sm">
+                    <span className="material-symbols-outlined text-primary">check_circle</span>
+                    Tudo do plano mensal
+                  </li>
+                  <li className="flex items-center gap-2 text-sm">
+                    <span className="material-symbols-outlined text-primary">check_circle</span>
+                    Suporte Prioritário
+                  </li>
+                </ul>
+                <button 
+                  onClick={() => handleUpgrade('price_1TcE3oII9Ml3L1z0fSe97jVw')}
+                  className="w-full bg-primary text-on-primary py-3 rounded-lg font-bold hover:opacity-90 transition-opacity"
+                >
+                  Assinar Anual
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="mb-12 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div>
+          <h2 className="text-4xl font-headline font-bold text-on-surface tracking-tight mb-2">
+            {t('dashboard.title')}
+          </h2>
+          <p className="text-on-surface/70 font-body text-lg">
+            {t('dashboard.subtitle')}
+          </p>
+        </div>
+        <div className="flex items-center gap-4">
+          <div className={`px-4 py-2 rounded-full font-label text-sm font-bold uppercase tracking-widest ${tier === 'paid' ? 'bg-primary text-on-primary' : 'bg-surface-container-high text-on-surface-variant'}`}>
+            {tier === 'paid' ? 'Paid Plan' : 'Free Plan'}
+          </div>
+          {tier === 'free' && (
+            <button 
+              onClick={() => setShowPricing(true)}
+              className="bg-tertiary text-on-tertiary px-6 py-2 rounded-full font-bold hover:opacity-90 transition-opacity flex items-center gap-2"
+            >
+              <span className="material-symbols-outlined text-sm">workspace_premium</span>
+              {t('freemium.upgrade_now')}
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
-        <MetricCard title={t('dashboard.metrics.total_builders')} value={metrics.builders} icon="engineering" />
-        <MetricCard title={t('dashboard.metrics.active_projects')} value={metrics.projects} icon="apartment" />
-        <MetricCard title={t('dashboard.metrics.new_leads')} value={metrics.leads} icon="groups" />
+        <MetricCard title={t('dashboard.metrics.total_builders')} value={counts.builders} icon="engineering" />
+        <MetricCard title={t('dashboard.metrics.active_projects')} value={counts.developments} icon="apartment" />
+        <MetricCard title={t('dashboard.metrics.new_leads')} value={0} icon="groups" />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
