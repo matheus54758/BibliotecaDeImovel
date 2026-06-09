@@ -102,7 +102,7 @@ export const Dashboard = () => {
               {/* Plano Mensal */}
               <div className="bg-surface-container-low p-8 rounded-xl border border-surface-container-high flex flex-col h-full">
                 <h3 className="text-xl font-headline font-bold mb-2">Plano Mensal</h3>
-                <p className="text-3xl font-headline font-black text-primary mb-6">R$ 39,90<span className="text-sm font-normal text-on-surface-variant">/mês</span></p>
+                <p className="text-3xl font-headline font-black text-primary mb-6">R$ 1,00<span className="text-sm font-normal text-on-surface-variant">/mês</span></p>
                 <ul className="space-y-4 mb-8 flex-1">
                   <li className="flex items-center gap-2 text-sm">
                     <span className="material-symbols-outlined text-primary">check_circle</span>
@@ -126,7 +126,7 @@ export const Dashboard = () => {
                     Cartão Mensal
                   </button>
                   <button 
-                    onClick={() => handlePixUpgrade('monthly', 39.90, 'Plano Mensal - Lumis')}
+                    onClick={() => handlePixUpgrade('monthly', 1.00, 'Plano Mensal - Lumis (Teste Final)')}
                     className="w-full bg-surface-container-highest text-on-surface py-3 rounded-lg font-bold hover:opacity-80 transition-opacity flex items-center justify-center gap-2 border border-outline-variant"
                   >
                     <span className="material-symbols-outlined text-sm">qr_code</span>
