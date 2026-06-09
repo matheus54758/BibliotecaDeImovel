@@ -25,47 +25,48 @@ export const useUserTier = () => {
   const [counts, setCounts] = useState({ builders: 0, developments: 0 });
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    async function fetchTierAndCounts() {
-      try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
+  const fetchTierAndCounts = async () => {
+    try {
+      // Use getUser(token) to bypass cache and get fresh metadata from server
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError || !user) return;
 
-        // 1. Get tier from user_metadata
-        const metadata = { ...user.app_metadata, ...user.user_metadata };
-        const userTier = (metadata.tier as UserTier) || 'free';
-        setTier(userTier);
+      // 1. Get tier from user_metadata
+      const metadata = { ...user.app_metadata, ...user.user_metadata };
+      const userTier = (metadata.tier as UserTier) || 'free';
+      setTier(userTier);
 
-        if (userTier === 'paid') {
-          setSubscriptionDates({
-            start: metadata.subscription_start as string,
-            end: metadata.subscription_end as string,
-          });
-        }
-
-        // 2. Get current counts
-        const [buildersRes, developmentsRes] = await Promise.all([
-          supabase
-            .from('builders')
-            .select('*', { count: 'exact', head: true })
-            .eq('user_id', user.id),
-          supabase
-            .from('developments')
-            .select('*', { count: 'exact', head: true })
-            .eq('user_id', user.id),
-        ]);
-
-        setCounts({
-          builders: buildersRes.count || 0,
-          developments: developmentsRes.count || 0,
+      if (userTier === 'paid') {
+        setSubscriptionDates({
+          start: metadata.subscription_start as string,
+          end: metadata.subscription_end as string,
         });
-      } catch (error) {
-        console.error('Error fetching tier info:', error);
-      } finally {
-        setLoading(false);
       }
-    }
 
+      // 2. Get current counts
+      const [buildersRes, developmentsRes] = await Promise.all([
+        supabase
+          .from('builders')
+          .select('*', { count: 'exact', head: true })
+          .eq('user_id', user.id),
+        supabase
+          .from('developments')
+          .select('*', { count: 'exact', head: true })
+          .eq('user_id', user.id),
+      ]);
+
+      setCounts({
+        builders: buildersRes.count || 0,
+        developments: developmentsRes.count || 0,
+      });
+    } catch (error) {
+      console.error('Error fetching tier info:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
     fetchTierAndCounts();
   }, []);
 
@@ -82,5 +83,6 @@ export const useUserTier = () => {
     loading,
     canAddBuilder,
     canAddDevelopment,
+    refresh: fetchTierAndCounts
   };
 };

@@ -5,10 +5,11 @@ import { useUserTier } from "../hooks/useUserTier";
 
 export const Dashboard = () => {
   const { t } = useTranslation();
-  const { tier, counts, loading: tierLoading } = useUserTier();
+  const { tier, counts, loading: tierLoading, refresh } = useUserTier();
   const [activities] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showPricing, setShowPricing] = useState(false);
+  const [pixData, setPixData] = useState<{ qr_code: string, qr_code_base64: string, copy_paste: string } | null>(null);
 
   useEffect(() => {
     // Only set loading false when both dashboard and tier data are ready
@@ -16,6 +17,23 @@ export const Dashboard = () => {
       setLoading(false);
     }
   }, [tierLoading]);
+
+  // Polling para verificar se o pagamento foi aprovado
+  useEffect(() => {
+    let interval: any;
+    if (pixData && tier === 'free') {
+      interval = setInterval(() => {
+        refresh();
+      }, 5000); // Checa a cada 5 segundos
+    }
+
+    if (tier === 'paid' && pixData) {
+      setPixData(null);
+      alert("Pagamento aprovado! Seu acesso Premium foi liberado.");
+    }
+
+    return () => clearInterval(interval);
+  }, [pixData, tier, refresh]);
 
   const handleUpgrade = async (priceId: string) => {
     try {
@@ -37,6 +55,27 @@ export const Dashboard = () => {
     } catch (error) {
       console.error("Error creating checkout session:", error);
       alert("Falha ao iniciar processo de pagamento.");
+    }
+  };
+
+  const handlePixUpgrade = async (priceId: string, amount: number, description: string) => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      setLoading(true);
+      const { data, error } = await supabase.functions.invoke('create-mercadopago-payment', {
+        body: { priceId, amount, description }
+      });
+
+      if (error) throw error;
+      setPixData(data);
+      setShowPricing(false);
+    } catch (error) {
+      console.error("Error creating PIX payment:", error);
+      alert("Falha ao gerar código PIX.");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -78,12 +117,22 @@ export const Dashboard = () => {
                     Flexibilidade para cancelar
                   </li>
                 </ul>
-                <button 
-                  onClick={() => handleUpgrade('price_1TcE0jII9Ml3L1z01fvzbffM')}
-                  className="w-full bg-primary text-on-primary py-3 rounded-lg font-bold hover:opacity-90 transition-opacity"
-                >
-                  Assinar Mensal
-                </button>
+                <div className="space-y-3">
+                  <button 
+                    onClick={() => handleUpgrade('price_1TcE0jII9Ml3L1z01fvzbffM')}
+                    className="w-full bg-primary text-on-primary py-3 rounded-lg font-bold hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
+                  >
+                    <span className="material-symbols-outlined text-sm">credit_card</span>
+                    Cartão Mensal
+                  </button>
+                  <button 
+                    onClick={() => handlePixUpgrade('monthly', 39.90, 'Plano Mensal - Lumis')}
+                    className="w-full bg-surface-container-highest text-on-surface py-3 rounded-lg font-bold hover:opacity-80 transition-opacity flex items-center justify-center gap-2 border border-outline-variant"
+                  >
+                    <span className="material-symbols-outlined text-sm">qr_code</span>
+                    Pagar com PIX
+                  </button>
+                </div>
               </div>
 
               {/* Plano Anual */}
@@ -105,13 +154,70 @@ export const Dashboard = () => {
                     Suporte Prioritário
                   </li>
                 </ul>
-                <button 
-                  onClick={() => handleUpgrade('price_1TcE3oII9Ml3L1z0fSe97jVw')}
-                  className="w-full bg-primary text-on-primary py-3 rounded-lg font-bold hover:opacity-90 transition-opacity"
-                >
-                  Assinar Anual
-                </button>
+                <div className="space-y-3">
+                  <button 
+                    onClick={() => handleUpgrade('price_1TcE3oII9Ml3L1z0fSe97jVw')}
+                    className="w-full bg-primary text-on-primary py-3 rounded-lg font-bold hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
+                  >
+                    <span className="material-symbols-outlined text-sm">credit_card</span>
+                    Cartão Anual
+                  </button>
+                  <button 
+                    onClick={() => handlePixUpgrade('annual', 399.90, 'Plano Anual - Lumis')}
+                    className="w-full bg-surface-container-highest text-on-surface py-3 rounded-lg font-bold hover:opacity-80 transition-opacity flex items-center justify-center gap-2 border border-outline-variant"
+                  >
+                    <span className="material-symbols-outlined text-sm">qr_code</span>
+                    Pagar com PIX
+                  </button>
+                </div>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {pixData && (
+        <div className="fixed inset-0 bg-on-surface/50 backdrop-blur-sm z-[110] flex items-center justify-center p-4">
+          <div className="bg-surface-container-lowest rounded-2xl p-8 max-w-md w-full sunken-shadow relative text-center">
+            <button 
+              onClick={() => setPixData(null)}
+              className="absolute top-6 right-6 text-on-surface-variant hover:text-on-surface"
+            >
+              <span className="material-symbols-outlined">close</span>
+            </button>
+            
+            <h2 className="text-2xl font-headline font-bold mb-6">Pague com PIX</h2>
+            
+            <div className="bg-white p-4 rounded-xl inline-block mb-6 shadow-inner border border-outline-variant">
+              <img 
+                src={`data:image/jpeg;base64,${pixData.qr_code_base64}`} 
+                alt="PIX QR Code" 
+                className="w-48 h-48"
+              />
+            </div>
+            
+            <p className="text-sm text-on-surface/70 mb-4 font-body">Escaneie o QR Code acima ou copie o código abaixo:</p>
+            
+            <div className="bg-surface-container-low p-3 rounded-lg flex items-center gap-3 mb-6 border border-outline-variant">
+              <code className="text-[10px] break-all flex-1 text-left font-mono">{pixData.copy_paste}</code>
+              <button 
+                onClick={() => {
+                  navigator.clipboard.writeText(pixData.copy_paste);
+                  alert("Código copiado!");
+                }}
+                className="p-2 bg-primary text-on-primary rounded-md shrink-0"
+                title="Copiar código"
+              >
+                <span className="material-symbols-outlined text-sm">content_copy</span>
+              </button>
+            </div>
+            
+            <div className="bg-primary/5 p-4 rounded-xl border border-primary/20">
+              <p className="text-xs text-primary font-bold flex items-center justify-center gap-2 uppercase tracking-widest">
+                <span className="material-symbols-outlined text-sm">sync</span>
+                Aguardando Pagamento...
+              </p>
+              <p className="text-[10px] text-on-surface/50 mt-1">Sua conta será ativada automaticamente após o pagamento.</p>
             </div>
           </div>
         </div>
@@ -220,4 +326,3 @@ const ActivityItem = ({ title, desc, time, icon, iconColor, bgColor }: any) => (
     <span className="text-xs text-on-surface/50 font-label">{time}</span>
   </div>
 );
-
