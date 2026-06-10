@@ -22,6 +22,7 @@ function App() {
         <Route element={<ProtectedRoute />}>
           <Route element={<DashboardLayout />}>
             <Route path="/" element={<Dashboard />} />
+            <Route path="/project-developments" element={<Developments />} />
             <Route path="/developments" element={<Developments />} />
             <Route path="/developments/new" element={<NewDevelopment />} />
             <Route path="/developments/edit/:id" element={<NewDevelopment />} />

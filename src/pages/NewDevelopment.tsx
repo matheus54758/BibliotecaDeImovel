@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { useTranslation } from "react-i18next";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -14,7 +14,9 @@ export const NewDevelopment = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { id } = useParams();
+  const [searchParams] = useSearchParams();
   const isEditing = Boolean(id);
+  const isForcedProject = searchParams.get("type") === "project";
   const { canAddDevelopment } = useUserTier();
   
   const [builders, setBuilders] = useState<any[]>([]);
@@ -22,6 +24,7 @@ export const NewDevelopment = () => {
   const [fetching, setFetching] = useState(false);
   const [galleryMedia, setGalleryMedia] = useState<{url: string, type: 'image' | 'video'}[]>([]);
   const [showFloorPlan, setShowFloorPlan] = useState(false);
+  const [isProject, setIsProject] = useState(isForcedProject);
   
   const {
     register,
@@ -43,6 +46,7 @@ export const NewDevelopment = () => {
   const heroImageUrl = watch("hero_image_url");
   const videoUrl = watch("video_url");
   const floorPlanUrl = watch("floor_plan_url");
+  const selectedBuilderId = watch("builder_id");
 
   useEffect(() => {
     async function fetchData() {
@@ -69,8 +73,19 @@ export const NewDevelopment = () => {
             .single();
           
           if (propError) throw propError;
-          reset(propData);
+
+          // Garantir que campos nulos do banco venham como string vazia para o formulário
+          const formData = {
+            ...propData,
+            video_url: propData.video_url || "",
+            floor_plan_url: propData.floor_plan_url || "",
+            description: propData.description || "",
+            location: propData.location || "",
+          };
+
+          reset(formData);
           if (propData.floor_plan_url) setShowFloorPlan(true);
+          if (propData.builder_id) setIsProject(true);
 
           // Fetch gallery
           const { data: galleryData } = await supabase
@@ -105,9 +120,42 @@ export const NewDevelopment = () => {
     setGalleryMedia(galleryMedia.filter((_, i) => i !== index));
   };
 
+  const [extractedUnits, setExtractedUnits] = useState<any[]>([]);
+  const [processingPdf, setProcessingPdf] = useState(false);
+
+  const handlePdfUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setProcessingPdf(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const { data, error } = await supabase.functions.invoke('process-pdf-units', {
+        body: formData,
+      });
+
+      if (error) throw error;
+      
+      setExtractedUnits(data || []);
+      alert(`Sucesso! Encontramos ${data.length} unidades no PDF.`);
+    } catch (error: any) {
+      console.error("Error processing PDF:", error);
+      alert("Falha ao processar PDF: " + error.message);
+    } finally {
+      setProcessingPdf(false);
+    }
+  };
+
   const onSubmit = async (data: DevelopmentInput) => {
     if (!isEditing && !canAddDevelopment) {
       alert(t('freemium.development_limit_desc'));
+      return;
+    }
+
+    if (isProject && !data.builder_id) {
+      alert(t('new_development.select_partner'));
       return;
     }
 
@@ -117,8 +165,26 @@ export const NewDevelopment = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("User not authenticated");
 
+      // Handle bulk import if units were extracted
+      if (extractedUnits.length > 0 && !isEditing) {
+        const unitsToInsert = extractedUnits.map(unit => ({
+          ...unit,
+          builder_id: isProject ? data.builder_id : null,
+          user_id: user.id,
+          location: data.location || "Location pending",
+          hero_image_url: data.hero_image_url || "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?q=80&w=2070&auto=format&fit=crop"
+        }));
+
+        const { error: unitsError } = await supabase.from('developments').insert(unitsToInsert);
+        if (unitsError) throw unitsError;
+        
+        window.location.hash = isProject ? "/project-developments" : "/developments";
+        return;
+      }
+
       const developmentData = {
         ...data,
+        builder_id: isProject ? data.builder_id : null,
         floor_plan_url: showFloorPlan ? data.floor_plan_url : "",
         user_id: user.id
       };
@@ -158,10 +224,10 @@ export const NewDevelopment = () => {
         }
       }
 
-      navigate("/developments");
+      window.location.hash = isProject ? "/project-developments" : "/developments";
     } catch (error) {
       console.error("Error saving development:", error);
-      alert(isEditing ? "Failed to update development." : "Failed to create development.");
+      alert(isEditing ? "Failed to update." : "Failed to create.");
     } finally {
       setLoading(false);
     }
@@ -172,30 +238,52 @@ export const NewDevelopment = () => {
   return (
     <div className="max-w-3xl mx-auto py-12 px-4">
       <h1 className="font-headline text-3xl font-bold text-on-surface mb-2 tracking-tight">
-        {isEditing ? t('new_development.edit_title') : t('new_development.title')}
+        {isEditing 
+          ? (isProject ? t('new_development.edit_title') : t('new_development.edit_asset_title')) 
+          : (isProject ? t('new_development.title') : t('new_development.asset_title'))}
       </h1>
       <p className="font-body text-on-surface-variant mb-8 text-lg">
-        {isEditing ? t('new_development.edit_subtitle') : t('new_development.subtitle')}
+        {isProject ? t('new_development.subtitle') : t('new_development.asset_subtitle')}
       </p>
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
         <div className="bg-surface-container-lowest rounded-xl p-8 sunken-shadow space-y-6">
-          <h3 className="font-headline text-xl font-bold text-primary border-b border-surface-container-high pb-4">{t('new_development.core_details')}</h3>
+          <div className="flex justify-between items-center border-b border-surface-container-high pb-4">
+            <h3 className="font-headline text-xl font-bold text-primary">{t('new_development.core_details')}</h3>
+            <div className="flex bg-surface-container-high p-1 rounded-lg">
+              <button
+                type="button"
+                onClick={() => setIsProject(false)}
+                className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${!isProject ? 'bg-surface-bright text-primary shadow-sm' : 'text-on-surface/60 hover:text-on-surface'}`}
+              >
+                {t('nav.developments')}
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsProject(true)}
+                className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${isProject ? 'bg-surface-bright text-primary shadow-sm' : 'text-on-surface/60 hover:text-on-surface'}`}
+              >
+                {t('nav.project_developments')}
+              </button>
+            </div>
+          </div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-2 col-span-1 md:col-span-2">
-              <label className="block font-label text-sm font-medium text-on-surface">{t('new_development.partner')}</label>
-              <select
-                {...register("builder_id")}
-                className="w-full bg-surface-container-high border-0 rounded py-3 px-4 text-on-surface focus:ring-2 focus:ring-surface-tint/20 transition-colors appearance-none"
-              >
-                <option value="">{t('new_development.select_partner')}</option>
-                {builders.map(b => (
-                  <option key={b.id} value={b.id}>{b.name}</option>
-                ))}
-              </select>
-              {errors.builder_id && <p className="text-xs text-error font-medium">{errors.builder_id.message}</p>}
-            </div>
+            {isProject && (
+              <div className="space-y-2 col-span-1 md:col-span-2 animate-in fade-in slide-in-from-top-2 duration-300">
+                <label className="block font-label text-sm font-medium text-on-surface">{t('new_development.partner')} *</label>
+                <select
+                  {...register("builder_id")}
+                  className="w-full bg-surface-container-high border-0 rounded py-3 px-4 text-on-surface focus:ring-2 focus:ring-surface-tint/20 transition-colors appearance-none"
+                >
+                  <option value="">{t('new_development.select_partner')}</option>
+                  {builders.map(b => (
+                    <option key={b.id} value={b.id}>{b.name}</option>
+                  ))}
+                </select>
+                {errors.builder_id && <p className="text-xs text-error font-medium">{errors.builder_id.message}</p>}
+              </div>
+            )}
 
             <InputField 
               label={t('new_development.project_title')}
@@ -360,6 +448,51 @@ export const NewDevelopment = () => {
             </div>
           </div>
         </div>
+
+        {!isEditing && (
+          <div className="bg-surface-container-lowest rounded-xl p-8 sunken-shadow space-y-6">
+            <h3 className="font-headline text-xl font-bold text-primary border-b border-surface-container-high pb-4">
+              <span className="material-symbols-outlined mr-2">upload_file</span>
+              Importação em Massa via PDF
+            </h3>
+            <p className="font-body text-sm text-on-surface-variant">
+              Economize tempo! Suba a tabela de preços ou unidades em PDF e nossa IA extrairá todos os dados automaticamente.
+            </p>
+            
+            <div className="flex flex-col gap-4">
+              <label className={`
+                flex flex-col items-center justify-center w-full h-32 
+                border-2 border-dashed rounded-xl cursor-pointer 
+                transition-colors duration-200
+                ${processingPdf ? 'border-primary/50 bg-primary/5' : 'border-surface-container-highest hover:bg-surface-container-high'}
+              `}>
+                <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                  {processingPdf ? (
+                    <>
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mb-3"></div>
+                      <p className="text-sm text-primary font-medium animate-pulse">Inteligência Artificial processando...</p>
+                    </>
+                  ) : (
+                    <>
+                      <span className="material-symbols-outlined text-4xl text-on-surface-variant mb-2">picture_as_pdf</span>
+                      <p className="text-sm text-on-surface-variant"><span className="font-semibold">Clique para subir o PDF</span> ou arraste e solte</p>
+                    </>
+                  )}
+                </div>
+                <input type="file" className="hidden" accept=".pdf" onChange={handlePdfUpload} disabled={processingPdf} />
+              </label>
+
+              {extractedUnits.length > 0 && (
+                <div className="bg-tertiary-container/20 p-4 rounded-lg flex items-center gap-3 border border-tertiary-container/30">
+                  <span className="material-symbols-outlined text-tertiary">check_circle</span>
+                  <p className="text-sm font-medium text-on-tertiary-container">
+                    Pronto! Detectamos {extractedUnits.length} unidades. Clique em "Lançar" abaixo para cadastrar todas.
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         <div className="flex items-center justify-end gap-4">
           <Button variant="secondary" type="button" onClick={() => navigate(-1)}>{t('common.cancel')}</Button>

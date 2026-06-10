@@ -6,17 +6,45 @@ import { useUserTier } from "../hooks/useUserTier";
 export const Dashboard = () => {
   const { t } = useTranslation();
   const { tier, counts, loading: tierLoading, refresh } = useUserTier();
-  const [activities] = useState<any[]>([]);
+  const [activities, setActivities] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showPricing, setShowPricing] = useState(false);
   const [pixData, setPixData] = useState<{ qr_code: string, qr_code_base64: string, copy_paste: string } | null>(null);
 
   useEffect(() => {
-    // Only set loading false when both dashboard and tier data are ready
+    async function fetchDashboardData() {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
+        // Fetch latest property added
+        const { data: latestProp } = await supabase
+          .from('developments')
+          .select('id, title, created_at, hero_image_url')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (latestProp) {
+          setActivities([{
+            id: latestProp.id,
+            type: t('dashboard.recent_activities'), // Usando uma tradução existente ou texto direto
+            description: latestProp.title,
+            created_at: latestProp.created_at,
+            image: latestProp.hero_image_url
+          }]);
+        }
+      } catch (error) {
+        console.error("Error fetching dashboard data:", error);
+      }
+    }
+
     if (!tierLoading) {
       setLoading(false);
+      fetchDashboardData();
     }
-  }, [tierLoading]);
+  }, [tierLoading, t]);
 
   // Polling para verificar se o pagamento foi aprovado
   useEffect(() => {
@@ -248,54 +276,30 @@ export const Dashboard = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-12">
         <MetricCard title={t('dashboard.metrics.total_builders')} value={counts.builders} icon="engineering" />
         <MetricCard title={t('dashboard.metrics.active_projects')} value={counts.developments} icon="apartment" />
-        <MetricCard title={t('dashboard.metrics.new_leads')} value={0} icon="groups" />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
-        <div className="bg-surface-container-low rounded-xl p-8">
-          <h3 className="text-2xl font-headline font-bold text-on-surface mb-8">{t('dashboard.recent_activities')}</h3>
-          <div className="space-y-6">
-            {activities.length > 0 ? (
-              activities.map((act) => (
-                <ActivityItem 
-                  key={act.id}
-                  title={act.type} 
-                  desc={act.description} 
-                  time={new Date(act.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} 
-                  icon="description" 
-                  iconColor="text-primary" 
-                  bgColor="bg-primary/10"
-                />
-              ))
-            ) : (
-              <p className="text-on-surface/50 text-sm italic">{t('dashboard.no_activities')}</p>
-            )}
-          </div>
-        </div>
-
-        <div className="space-y-12">
-          <div className="relative h-full min-h-[300px] rounded-xl overflow-hidden shadow-sm group">
-            <img
-              src="https://lh3.googleusercontent.com/aida-public/AB6AXuARfqYK0_5hhdnG0x7Z8Q0XZ0lla3gZZakkJrLNPJRz9j8pUUFNkNti6OXzuHJ9cYZfjrYt-Zi0UC7Yb_HEEtIr-PAu4-phI8BMNj1eh4vj28zzi9EI8tvTTglgAVRtW1Y5tzweh_WDsbicnBg4ykskWyro-sNA93Ty4-Mf8NcRcJ2N1zqScK8-mVMRdxEToL0WDczgLQ4LWJu_J-P2lfgU1hd1cUHIyP16IwjCIhE7nmydcpc5jyUIF3JDQQMtsyUPaP9NGLRySvWL"
-              alt="Featured Property"
-              className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-on-surface/80 to-transparent"></div>
-            <div className="absolute bottom-0 left-0 right-0 p-6 glass-panel border-t border-white/10 m-4 rounded-lg">
-              <div className="flex justify-between items-end">
-                <div>
-                  <p className="text-xs font-bold text-primary tracking-wider uppercase mb-1">{t('dashboard.featured_label')}</p>
-                  <h4 className="text-xl font-headline font-bold text-on-surface">{t('dashboard.featured_title')}</h4>
-                </div>
-                <button className="bg-white/20 hover:bg-white/30 text-primary p-2 rounded-full backdrop-blur-md transition-colors">
-                  <span className="material-symbols-outlined">arrow_forward</span>
-                </button>
-              </div>
-            </div>
-          </div>
+      <div className="bg-surface-container-low rounded-xl p-8">
+        <h3 className="text-2xl font-headline font-bold text-on-surface mb-8">{t('dashboard.recent_activities')}</h3>
+        <div className="space-y-6">
+          {activities.length > 0 ? (
+            activities.map((act) => (
+              <ActivityItem 
+                key={act.id}
+                title={act.type} 
+                desc={act.description} 
+                time={new Date(act.created_at).toLocaleDateString()} 
+                icon="description" 
+                iconColor="text-primary" 
+                bgColor="bg-primary/10"
+                image={act.image}
+              />
+            ))
+          ) : (
+            <p className="text-on-surface/50 text-sm italic">{t('dashboard.no_activities')}</p>
+          )}
         </div>
       </div>
     </>
@@ -314,15 +318,23 @@ const MetricCard = ({ title, value, icon }: any) => (
   </div>
 );
 
-const ActivityItem = ({ title, desc, time, icon, iconColor, bgColor }: any) => (
-  <div className="flex items-start bg-surface-container-lowest p-5 rounded-lg hover:shadow-md transition-shadow">
-    <div className={`${bgColor} p-3 rounded-full mr-4`}>
-      <span className={`material-symbols-outlined ${iconColor}`}>{icon}</span>
-    </div>
+const ActivityItem = ({ title, desc, time, icon, iconColor, bgColor, image }: any) => (
+  <div className="flex items-center bg-surface-container-lowest p-6 rounded-xl hover:shadow-lg transition-all duration-300 border border-outline-variant/30">
+    {image ? (
+      <img src={image} alt={desc} className="w-24 h-24 rounded-lg object-cover mr-6 shadow-sm" />
+    ) : (
+      <div className={`${bgColor} p-4 rounded-xl mr-6`}>
+        <span className={`material-symbols-outlined text-3xl ${iconColor}`}>{icon}</span>
+      </div>
+    )}
     <div className="flex-1">
-      <p className="font-body font-medium text-on-surface">{title}</p>
-      <p className="text-sm text-on-surface/60 mt-1">{desc}</p>
+      {/* Removemos o 'title' (tipo da atividade) para evitar repetição */}
+      <p className="font-headline font-bold text-xl text-on-surface">{desc}</p>
+      <p className="text-sm text-on-surface/50 mt-1 font-body flex items-center gap-1">
+        <span className="material-symbols-outlined text-xs">calendar_today</span>
+        {time}
+      </p>
     </div>
-    <span className="text-xs text-on-surface/50 font-label">{time}</span>
+    <span className="material-symbols-outlined text-on-surface/20">chevron_right</span>
   </div>
 );

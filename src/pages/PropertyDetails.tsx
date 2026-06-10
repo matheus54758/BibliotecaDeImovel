@@ -55,7 +55,7 @@ export const PropertyDetails = () => {
       } else {
         console.log("Sucesso! Linhas apagadas:", count);
         alert("Imóvel removido com sucesso!");
-        window.location.replace('/developments');
+        window.location.hash = property?.builder_id ? '/project-developments' : '/developments';
       }
     } catch (err: any) {
       console.error("Erro catastrófico:", err);
@@ -154,7 +154,14 @@ export const PropertyDetails = () => {
 
       <nav className="py-6 text-sm text-on-surface-variant font-body flex justify-between items-center px-4">
         <ol className="flex items-center gap-2">
-          <li><button onClick={() => navigate('/developments')} className="hover:text-primary transition-colors">{t('nav.developments')}</button></li>
+          <li>
+            <button 
+              onClick={() => navigate(property.builder_id ? '/project-developments' : '/developments')} 
+              className="hover:text-primary transition-colors"
+            >
+              {property.builder_id ? t('nav.project_developments') : t('nav.developments')}
+            </button>
+          </li>
           <li><span className="material-symbols-outlined text-sm">chevron_right</span></li>
           <li className="font-medium text-on-surface">{property.title}</li>
         </ol>

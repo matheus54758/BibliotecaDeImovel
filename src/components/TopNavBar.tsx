@@ -24,6 +24,7 @@ export const TopNavBar = () => {
 
   const navItems = [
     { name: t('nav.overview'), icon: 'dashboard', path: '/' },
+    { name: t('nav.project_developments'), icon: 'corporate_fare', path: '/project-developments' },
     { name: t('nav.developments'), icon: 'apartment', path: '/developments' },
     { name: t('nav.construction'), icon: 'engineering', path: '/builders' },
     { name: t('nav.consultancy'), icon: 'business_center', path: '/consultancy' },

@@ -17,15 +17,15 @@ export const builderSchema = z.object({
 });
 
 export const developmentSchema = z.object({
-  builder_id: z.string().uuid("Please select a construction partner"),
+  builder_id: z.string().uuid("Please select a construction partner").optional().or(z.literal("")),
   title: z.string().min(3, "Project title is required"),
   location: z.string().min(3, "Location is required"),
   price_starting_at: z.coerce.number().positive("Price must be greater than 0"),
-  status: z.enum(["available", "pre_launch", "under_construction"]),
-  description: z.string().min(10, "Description must be more detailed"),
+  status: z.enum(["available", "pre_launch", "under_construction", "unavailable"]),
+  description: z.string().min(10, "Description must be more detailed").nullable().or(z.literal("")),
   hero_image_url: z.string().url("Hero image must be a valid URL"),
-  video_url: z.string().url("Video must be a valid URL").optional().or(z.literal("")),
-  floor_plan_url: z.string().url("Floor plan must be a valid URL").optional().or(z.literal("")),
+  video_url: z.string().url("Video must be a valid URL").nullable().or(z.literal("")),
+  floor_plan_url: z.string().url("Floor plan must be a valid URL").nullable().or(z.literal("")),
   sq_ft: z.coerce.number().positive("Area is required"),
   bedrooms: z.coerce.number().nonnegative(),
   bathrooms: z.coerce.number().nonnegative(),

@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { supabase } from "../lib/supabase";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useSearchParams, useLocation } from "react-router-dom";
 import { formatCurrency } from "../lib/utils";
 
 export const Developments = () => {
   const { t } = useTranslation();
+  const location = useLocation();
+  const isProjectsView = location.pathname === "/project-developments";
   const [developments, setDevelopments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchParams] = useSearchParams();
@@ -30,6 +32,12 @@ export const Developments = () => {
 
         if (builderId) {
           query = query.eq('builder_id', builderId);
+        } else if (isProjectsView) {
+          // Show only those with a builder
+          query = query.not('builder_id', 'is', null);
+        } else {
+          // Show only those WITHOUT a builder
+          query = query.is('builder_id', null);
         }
 
         const { data, error } = await query;
@@ -44,37 +52,42 @@ export const Developments = () => {
     }
 
     fetchDevelopments();
-  }, [builderId]);
+  }, [builderId, isProjectsView]);
 
   if (loading) {
-    return <div className="p-8 text-on-surface/50 font-body">{t('developments.loading')}</div>;
+    return <div className="p-8 text-on-surface/50 font-body">{t('common.loading')}</div>;
   }
+
+  const title = builderId 
+    ? t('developments.title_builder') 
+    : (isProjectsView ? t('developments.title_project') : t('developments.title_premium'));
+  
+  const subtitle = builderId 
+    ? t('developments.subtitle_builder')
+    : (isProjectsView ? t('developments.subtitle_projects') : t('developments.subtitle_all'));
 
   return (
     <div className="max-w-7xl mx-auto">
       <section className="mb-16 mt-8 flex flex-col md:flex-row justify-between items-end gap-8">
         <div className="max-w-2xl">
           <h2 className="text-4xl md:text-5xl font-headline font-extrabold text-on-surface tracking-tight mb-4 leading-tight">
-            {builderId ? t('developments.title_builder') : t('developments.title_premium')} <br />
+            {title} <br />
             <span className="bg-gradient-to-r from-primary to-primary-container bg-clip-text text-transparent">
               {t('developments.title_suffix')}
             </span>
           </h2>
           <p className="text-lg text-on-surface-variant font-body leading-relaxed max-w-xl">
-            {builderId 
-              ? t('developments.subtitle_builder')
-              : t('developments.subtitle_all')
-            }
+            {subtitle}
           </p>
         </div>
         <div className="flex gap-4 w-full md:w-auto">
-          <Link to="/developments/new">
+          <Link to={`/developments/new${isProjectsView ? '?type=project' : ''}`}>
             <button className="flex-1 md:flex-none bg-gradient-primary text-on-primary font-body font-medium py-2.5 px-6 rounded-lg hover:opacity-90 transition-opacity flex items-center justify-center gap-2">
               <span className="material-symbols-outlined text-sm">add</span>
-              {t('developments.new_asset')}
+              {isProjectsView ? t('developments.new_project') : t('developments.new_asset')}
             </button>
           </Link>
-          {builderId && (
+          {(builderId || isProjectsView) && (
             <Link to="/developments">
               <button className="flex-1 md:flex-none bg-surface-container-high text-primary font-body font-medium py-2.5 px-6 rounded-lg hover:bg-surface-container-highest transition-colors flex items-center justify-center gap-2">
                 {t('common.show_all')}
@@ -134,10 +147,13 @@ export const Developments = () => {
           ))
         ) : (
           <div className="col-span-full py-24 text-center bg-surface-container-low rounded-xl">
-             <p className="text-on-surface/50 font-body">{t('developments.no_developments')}</p>
+             <p className="text-on-surface/50 font-body">
+               {isProjectsView ? t('developments.no_projects') : t('developments.no_developments')}
+             </p>
           </div>
         )}
       </section>
     </div>
   );
 };
+

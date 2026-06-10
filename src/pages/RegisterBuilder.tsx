@@ -35,6 +35,9 @@ export const RegisterBuilder = () => {
 
   const logoUrl = watch("logo_url");
 
+  const [extractedUnits, setExtractedUnits] = useState<any[]>([]);
+  const [processingPdf, setProcessingPdf] = useState(false);
+
   useEffect(() => {
     if (isEditing) {
       async function fetchBuilder() {
@@ -60,6 +63,31 @@ export const RegisterBuilder = () => {
     }
   }, [id, isEditing, reset, navigate, t]);
 
+  const handlePdfUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setProcessingPdf(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const { data, error } = await supabase.functions.invoke('process-pdf-units', {
+        body: formData,
+      });
+
+      if (error) throw error;
+      
+      setExtractedUnits(data || []);
+      alert(`Sucesso! Encontramos ${data.length} unidades no PDF.`);
+    } catch (error: any) {
+      console.error("Error processing PDF:", error);
+      alert("Falha ao processar PDF: " + error.message);
+    } finally {
+      setProcessingPdf(false);
+    }
+  };
+
   const onSubmit = async (data: BuilderInput) => {
     if (!isEditing && !canAddBuilder) {
       alert(t('freemium.builder_limit_desc'));
@@ -77,6 +105,8 @@ export const RegisterBuilder = () => {
         user_id: user.id
       };
 
+      let builderIdToUse = id;
+
       if (isEditing) {
         const { error } = await supabase
           .from('builders')
@@ -85,8 +115,26 @@ export const RegisterBuilder = () => {
         
         if (error) throw error;
       } else {
-        const { error } = await supabase.from('builders').insert([{ ...builderData, status: 'active' }]);
+        const { data: newBuilder, error } = await supabase.from('builders').insert([{ ...builderData, status: 'active' }]).select().single();
         if (error) throw error;
+        builderIdToUse = newBuilder.id;
+      }
+
+      // If we have extracted units, save them now
+      if (extractedUnits.length > 0 && builderIdToUse) {
+        const unitsToInsert = extractedUnits.map(unit => ({
+          ...unit,
+          builder_id: builderIdToUse,
+          user_id: user.id,
+          location: data.address || "Location pending", // Use builder address as default
+          hero_image_url: "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?q=80&w=2070&auto=format&fit=crop" // Default image
+        }));
+
+        const { error: unitsError } = await supabase.from('developments').insert(unitsToInsert);
+        if (unitsError) {
+          console.error("Error inserting units:", unitsError);
+          alert("A construtora foi salva, mas houve um erro ao importar as unidades do PDF.");
+        }
       }
 
       navigate("/builders");
@@ -167,6 +215,49 @@ export const RegisterBuilder = () => {
                 <InputField label={t('builders.email')} type="email" {...register("email")} error={errors.email?.message} placeholder="contact@company.com" />
                 <InputField label={t('builders.phone')} type="tel" {...register("phone")} error={errors.phone?.message} placeholder="+1 (555) 000-0000" />
                 <InputField label={t('builders.address')} {...register("address")} error={errors.address?.message} className="md:col-span-2" placeholder="123 Builder Ave" />
+              </div>
+            </div>
+
+            <div className="bg-surface-container-lowest rounded-lg p-6 sunken-shadow relative z-10 space-y-6">
+              <h3 className="font-headline text-lg font-bold text-primary flex items-center border-b border-surface-container pb-4">
+                <span className="material-symbols-outlined mr-2">upload_file</span>
+                Importar Unidades (Opcional)
+              </h3>
+              <p className="font-body text-xs text-on-surface-variant">
+                Selecione um PDF com a tabela de unidades para cadastrá-las automaticamente.
+              </p>
+              
+              <div className="flex flex-col gap-4">
+                <label className={`
+                  flex flex-col items-center justify-center w-full h-32 
+                  border-2 border-dashed rounded-lg cursor-pointer 
+                  transition-colors duration-200
+                  ${processingPdf ? 'border-primary/50 bg-primary/5' : 'border-surface-container-highest hover:bg-surface-container-high'}
+                `}>
+                  <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                    {processingPdf ? (
+                      <>
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mb-3"></div>
+                        <p className="text-sm text-primary font-medium animate-pulse">Processando com IA...</p>
+                      </>
+                    ) : (
+                      <>
+                        <span className="material-symbols-outlined text-3xl text-on-surface-variant mb-2">picture_as_pdf</span>
+                        <p className="text-sm text-on-surface-variant"><span className="font-semibold">Clique para subir</span> ou arraste o PDF</p>
+                      </>
+                    )}
+                  </div>
+                  <input type="file" className="hidden" accept=".pdf" onChange={handlePdfUpload} disabled={processingPdf} />
+                </label>
+
+                {extractedUnits.length > 0 && (
+                  <div className="bg-tertiary-container/20 p-4 rounded-lg flex items-center gap-3 border border-tertiary-container/30">
+                    <span className="material-symbols-outlined text-tertiary">task_alt</span>
+                    <p className="text-sm font-medium text-on-tertiary-container">
+                      {extractedUnits.length} unidades encontradas e prontas para importação!
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
 
