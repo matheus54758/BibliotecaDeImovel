@@ -135,14 +135,16 @@ export const RegisterBuilder = () => {
           ...unit,
           builder_id: builderIdToUse,
           user_id: user.id,
-          location: data.address || "Location pending", // Use builder address as default
-          hero_image_url: "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?q=80&w=2070&auto=format&fit=crop" // Default image
+          location: data.address || "Location pending", 
+          hero_image_url: "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?q=80&w=2070&auto=format&fit=crop"
         }));
+
+        console.log("Tentando inserir unidades:", unitsToInsert);
 
         const { error: unitsError } = await supabase.from('developments').insert(unitsToInsert);
         if (unitsError) {
-          console.error("Error inserting units:", unitsError);
-          alert("A construtora foi salva, mas houve um erro ao importar as unidades do PDF.");
+          console.error("Erro detalhado do Supabase:", unitsError);
+          alert(`A construtora foi salva, mas as unidades falharam: ${unitsError.message} (${unitsError.details})`);
         }
       }
 
