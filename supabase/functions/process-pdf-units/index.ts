@@ -14,6 +14,11 @@ serve(async (req) => {
   }
 
   try {
+    if (!GEMINI_API_KEY) {
+      throw new Error('Chave GEMINI_API_KEY não configurada no Supabase.');
+    }
+
+    console.log(`Iniciando processamento com chave tipo AQ...`);
     const formData = await req.formData()
     const file = formData.get('file') as File
     
@@ -51,11 +56,14 @@ serve(async (req) => {
       4. Certifique-se de capturar o valor monetário corretamente como um número.
     `
 
-    console.log(`Processando arquivo: ${file.name}, tipo: ${file.type}, tamanho: ${file.size} bytes`);
+    console.log(`Enviando para o Gemini: ${file.name} (${file.size} bytes)`);
 
-    const response = await fetch(`${GEMINI_API_URL}?key=${GEMINI_API_KEY}`, {
+    const response = await fetch(GEMINI_API_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        'x-goog-api-key': GEMINI_API_KEY 
+      },
       body: JSON.stringify({
         contents: [{
           parts: [
@@ -76,8 +84,14 @@ serve(async (req) => {
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error("Erro na API do Gemini:", errorText);
-      throw new Error(`Google API error: ${response.status} ${response.statusText}`);
+      console.error("Erro detalhado da API do Gemini:", errorText);
+      return new Response(JSON.stringify({ 
+        error: "Erro na API do Google Gemini", 
+        details: errorText 
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
     const result = await response.json()

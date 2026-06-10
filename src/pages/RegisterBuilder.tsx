@@ -76,7 +76,12 @@ export const RegisterBuilder = () => {
         body: formData,
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error("Erro detalhado da função:", error);
+        // Tenta extrair a mensagem de erro do corpo da resposta se disponível
+        const errorDetails = error instanceof Error ? error.message : JSON.stringify(error);
+        throw new Error(errorDetails);
+      }
       
       setExtractedUnits(data || []);
       alert(`Sucesso! Encontramos ${data.length} unidades no PDF.`);
