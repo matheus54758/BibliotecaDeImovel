@@ -393,7 +393,7 @@ export const NewDevelopment = () => {
             <MediaUpload 
               label={t('new_development.primary_image')}
               onUpload={(url) => setValue("hero_image_url", url, { shouldValidate: true })}
-              previewUrl={heroImageUrl}
+              previewUrl={heroImageUrl || undefined}
               accept="image"
             />
             {errors.hero_image_url && <p className="text-xs text-error font-medium">{errors.hero_image_url.message}</p>}
@@ -401,7 +401,7 @@ export const NewDevelopment = () => {
             <MediaUpload 
               label={t('new_development.highlight_video')}
               onUpload={(url) => setValue("video_url", url, { shouldValidate: true })}
-              previewUrl={videoUrl}
+              previewUrl={videoUrl || undefined}
               accept="video"
             />
             {errors.video_url && <p className="text-xs text-error font-medium">{errors.video_url.message}</p>}
@@ -410,7 +410,7 @@ export const NewDevelopment = () => {
               <MediaUpload 
                 label={t('new_development.floor_plan_label')}
                 onUpload={(url) => setValue("floor_plan_url", url, { shouldValidate: true })}
-                previewUrl={floorPlanUrl}
+                previewUrl={floorPlanUrl || undefined}
                 accept="image"
               />
             )}

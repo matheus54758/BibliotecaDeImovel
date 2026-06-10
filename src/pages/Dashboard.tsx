@@ -317,7 +317,7 @@ const MetricCard = ({ title, value, icon }: any) => (
   </div>
 );
 
-const ActivityItem = ({ title, desc, time, icon, iconColor, bgColor, image }: any) => (
+const ActivityItem = ({ desc, time, icon, iconColor, bgColor, image }: any) => (
   <div className="flex items-center bg-surface-container-lowest p-6 rounded-xl hover:shadow-lg transition-all duration-300 border border-outline-variant/30">
     {image ? (
       <img src={image} alt={desc} className="w-24 h-24 rounded-lg object-cover mr-6 shadow-sm" />
