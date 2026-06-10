@@ -1,11 +1,9 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-
-const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY')
-const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent"
+import { encode } from "https://deno.land/std@0.168.0/encoding/base64.ts"
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-filename',
 }
 
 serve(async (req) => {
@@ -13,105 +11,54 @@ serve(async (req) => {
     return new Response('ok', { headers: corsHeaders })
   }
 
+  console.log("--- NOVA REQUISIÇÃO RECEBIDA ---");
+
   try {
-    if (!GEMINI_API_KEY) {
-      throw new Error('Chave GEMINI_API_KEY não configurada no Supabase.');
-    }
+    const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY')
+    if (!GEMINI_API_KEY) throw new Error("GEMINI_API_KEY não configurada.");
 
-    console.log(`Iniciando processamento com chave tipo AQ...`);
-    const formData = await req.formData()
-    const file = formData.get('file') as File
-    
-    if (!file) {
-      throw new Error('Nenhum arquivo PDF enviado.')
-    }
+    // Lendo o corpo bruto do arquivo
+    const arrayBuffer = await req.arrayBuffer();
+    if (arrayBuffer.byteLength === 0) throw new Error("Arquivo vazio recebido.");
 
-    // Converter arquivo para Base64
-    const arrayBuffer = await file.arrayBuffer()
-    const base64Data = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)))
+    console.log(`Arquivo recebido: ${req.headers.get('x-filename') || 'documento.pdf'} (${arrayBuffer.byteLength} bytes)`);
+    const base64Data = encode(new Uint8Array(arrayBuffer))
 
-    const prompt = `
-      Você é um extrator de dados imobiliários especializado em tabelas de vendas de construtoras.
-      Sua tarefa é extrair os dados de TODAS as unidades disponíveis no PDF anexo.
-      Procure por: Número da Unidade/Andar, Tipo, Vaga, m² privativo, Valor e Status.
+    const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
 
-      Retorne APENAS um array JSON de objetos, seguindo EXATAMENTE este formato:
-      [
-        {
-          "title": "Apto 101",
-          "sq_ft": 85.5,
-          "price_starting_at": 950000,
-          "status": "available", 
-          "bedrooms": 2,
-          "bathrooms": 2,
-          "parking_spaces": 1,
-          "description": "Unidade com mezanino, valor inclui entrada de 20% e saldo pós obra."
-        }
-      ]
-
-      Regras de mapeamento:
-      1. status deve ser 'available' para disponível/vago ou 'unavailable' para reservado/vendido.
-      2. Se não achar quartos/banheiros, use 0.
-      3. Coloque detalhes de pagamento (Entrada, Parcelas, Mezanino) no campo description.
-      4. Certifique-se de capturar o valor monetário corretamente como um número.
-    `
-
-    console.log(`Enviando para o Gemini: ${file.name} (${file.size} bytes)`);
+    const prompt = `Extraia unidades imobiliárias deste PDF em um array JSON: [{"title": "Apto 101", "sq_ft": 85.5, "price_starting_at": 950000, "status": "available", "parking_spaces": 1}]. Use 'available' ou 'unavailable'.`;
 
     const response = await fetch(GEMINI_API_URL, {
       method: 'POST',
-      headers: { 
-        'Content-Type': 'application/json',
-        'x-goog-api-key': GEMINI_API_KEY 
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        contents: [{
-          parts: [
-            { text: prompt },
-            {
-              inline_data: {
-                mime_type: "application/pdf",
-                data: base64Data
-              }
-            }
-          ]
-        }],
-        generationConfig: {
-          response_mime_type: "application/json",
-        }
+        contents: [{ parts: [{ text: prompt }, { inline_data: { mime_type: "application/pdf", data: base64Data } }] }],
+        generationConfig: { response_mime_type: "application/json" }
       })
     })
 
+    const responseText = await response.text();
+    
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error("Erro detalhado da API do Gemini:", errorText);
-      return new Response(JSON.stringify({ 
-        error: "Erro na API do Google Gemini", 
-        details: errorText 
-      }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      console.error("Erro do Google:", responseText);
+      // Retornamos 200 com o erro no corpo para que o frontend consiga ler a mensagem!
+      return new Response(JSON.stringify({ error: "Erro na IA do Google", details: responseText }), {
+        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
 
-    const result = await response.json()
-    console.log("Resposta do Gemini recebida com sucesso.");
-
-    const content = result.candidates?.[0]?.content?.parts?.[0]?.text
-    
-    if (!content) {
-      console.error("Gemini retornou um resultado vazio:", JSON.stringify(result));
-      throw new Error("A IA não conseguiu extrair dados deste PDF. Verifique se o arquivo contém texto legível.");
-    }
+    const result = JSON.parse(responseText);
+    const content = result.candidates?.[0]?.content?.parts?.[0]?.text;
 
     return new Response(content, {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    })
+    });
 
   } catch (error) {
+    console.error("Erro Crítico:", error.message);
     return new Response(JSON.stringify({ error: error.message }), {
-      status: 400,
+      status: 200, // Forçamos 200 para garantir que o erro chegue no seu alert
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    })
+    });
   }
 })

@@ -69,18 +69,23 @@ export const RegisterBuilder = () => {
 
     setProcessingPdf(true);
     try {
-      const formData = new FormData();
-      formData.append('file', file);
+      const arrayBuffer = await file.arrayBuffer();
 
       const { data, error } = await supabase.functions.invoke('process-pdf-units', {
-        body: formData,
+        body: arrayBuffer,
+        headers: {
+          'x-filename': encodeURIComponent(file.name),
+          'Content-Type': 'application/pdf'
+        }
       });
 
       if (error) {
-        console.error("Erro detalhado da função:", error);
-        // Tenta extrair a mensagem de erro do corpo da resposta se disponível
-        const errorDetails = error instanceof Error ? error.message : JSON.stringify(error);
-        throw new Error(errorDetails);
+        console.error("Erro na função:", error);
+        throw new Error("Erro no servidor do Supabase. Verifique os logs das Edge Functions.");
+      }
+
+      if (data.error) {
+        throw new Error(data.details || data.error);
       }
       
       setExtractedUnits(data || []);
