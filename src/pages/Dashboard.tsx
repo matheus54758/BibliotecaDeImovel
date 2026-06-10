@@ -288,7 +288,6 @@ export const Dashboard = () => {
             activities.map((act) => (
               <ActivityItem 
                 key={act.id}
-                title={act.type} 
                 desc={act.description} 
                 time={new Date(act.created_at).toLocaleDateString()} 
                 icon="description" 

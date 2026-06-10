@@ -46,7 +46,6 @@ export const NewDevelopment = () => {
   const heroImageUrl = watch("hero_image_url");
   const videoUrl = watch("video_url");
   const floorPlanUrl = watch("floor_plan_url");
-  const selectedBuilderId = watch("builder_id");
 
   useEffect(() => {
     async function fetchData() {
