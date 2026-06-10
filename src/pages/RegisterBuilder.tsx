@@ -74,7 +74,6 @@ export const RegisterBuilder = () => {
       const { data, error } = await supabase.functions.invoke('process-pdf-units', {
         body: arrayBuffer,
         headers: {
-          'x-filename': encodeURIComponent(file.name),
           'Content-Type': 'application/pdf'
         }
       });
