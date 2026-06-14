@@ -175,44 +175,6 @@ export const PropertyDetails = () => {
     setSubUnits(data || []);
   }
 
-  const handleAddManualUnit = async (e: any) => {
-    e.preventDefault();
-    const formData = new FormData(e.target);
-    const { data: { user } } = await supabase.auth.getUser();
-    
-    const newUnit = {
-      title: formData.get('title'),
-      unit_type: formData.get('type'),
-      price_starting_at: Number(formData.get('price')),
-      sq_ft: Number(formData.get('sq_ft')),
-      payment_entry: Number(formData.get('entry')),
-      payment_installment_value: Number(formData.get('inst_val')),
-      payment_installment_count: Number(formData.get('inst_count')),
-      payment_reinforcement_value: Number(formData.get('reinf_val')),
-      payment_reinforcement_count: Number(formData.get('reinf_count')),
-      payment_post_construction: Number(formData.get('post_val')),
-      floor_plan_url: formData.get('floor_plan'),
-      floor_layout_url: formData.get('floor_layout'),
-      parent_id: id,
-      builder_id: property.builder_id,
-      user_id: user?.id,
-      status: 'available',
-      location: property.location,
-      hero_image_url: property.hero_image_url,
-      description: "Cadastro manual",
-      bedrooms: 0,
-      bathrooms: 0,
-      parking_spaces: 0
-    };
-
-    const { error } = await supabase.from('developments').insert([newUnit]);
-    if (error) alert("Erro ao salvar: " + error.message);
-    else {
-      setShowAddModal(false);
-      fetchSubUnits();
-    }
-  };
-
   const handleDelete = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -707,6 +669,28 @@ export const PropertyDetails = () => {
 
                         {unit.description && unit.description !== "Cadastro manual" && (
                           <p className="text-[10px] text-on-surface-variant/70 leading-relaxed italic line-clamp-2">
+                            {unit.description}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-end justify-between border-t border-outline-variant/10 pt-4">
+                      <span className="text-xl font-headline font-black text-primary">{unit.price_starting_at ? formatCurrency(unit.price_starting_at) : t('common.consult')}</span>
+                      <Link to={`/units/${unit.id}`} state={{ isProject: false }} className="text-xs font-bold text-on-surface-variant hover:text-primary underline uppercase tracking-widest transition-colors">Detalhes</Link>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            ) : (
+              <div className="py-20 text-center bg-surface-container-low/50 rounded-2xl border-2 border-dashed border-outline-variant/20"><span className="material-symbols-outlined text-6xl text-on-surface/10 mb-4 italic">apartment</span><p className="text-on-surface-variant font-body text-lg italic">Nenhuma unidade cadastrada neste empreendimento ainda.</p><p className="text-sm text-on-surface/40 mt-2">Use o botão acima para importar unidades via PDF.</p></div>
+            )}
+          </section>
+        </div>
+      )}
+    </div>
+  );
+};
+ line-clamp-2">
                             {unit.description}
                           </p>
                         )}
