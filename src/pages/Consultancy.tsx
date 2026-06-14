@@ -38,6 +38,7 @@ export const Consultancy = () => {
         .from('developments')
         .select('*')
         .eq('user_id', user.id)
+        .is('parent_id', null) // Mostra apenas prédios
         .order('created_at', { ascending: false });
 
       // Apply tag filters
@@ -149,8 +150,12 @@ export const Consultancy = () => {
                       alt={prop.title}
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
                     />
-                    <div className="absolute top-4 right-4 bg-surface-container-lowest/90 backdrop-blur px-3 py-1 rounded-full text-xs font-bold text-primary">
-                      {t(`status.${prop.status}`)}
+                    <div className={`absolute top-4 right-4 backdrop-blur px-3 py-1 rounded-full text-xs font-bold ${
+                      prop.title?.includes('(INDISPONÍVEL)') 
+                        ? 'bg-error/10 text-error border border-error/20' 
+                        : 'bg-surface-container-lowest/90 text-primary'
+                    }`}>
+                      {prop.title?.includes('(INDISPONÍVEL)') ? t('status.unavailable') : t(`status.${prop.status}`)}
                     </div>
                   </div>
                   <div className="p-6 space-y-4">

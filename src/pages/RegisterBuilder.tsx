@@ -131,24 +131,88 @@ export const RegisterBuilder = () => {
 
       // If we have extracted units, save them now
       if (extractedUnits.length > 0 && builderIdToUse) {
-        const unitsToInsert = extractedUnits.map(unit => ({
-          ...unit,
-          builder_id: builderIdToUse,
-          user_id: user.id,
-          location: data.address || "Location pending", 
-          hero_image_url: "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?q=80&w=2070&auto=format&fit=crop"
-        }));
+        const cleanNumber = (val: any) => {
+          if (!val) return 0;
+          let str = String(val).replace(/R\$/g, '').trim();
+          
+          if (str.includes(',') && str.includes('.')) {
+            str = str.replace(/\./g, '');
+          }
+          
+          str = str.replace(',', '.');
+          
+          const parts = str.split('.');
+          if (parts.length > 2) {
+            str = parts.slice(0, -1).join('') + '.' + parts[parts.length - 1];
+          }
 
-        console.log("Tentando inserir unidades:", unitsToInsert);
+          const num = parseFloat(str.replace(/[^-0-9.]/g, '')) || 0;
+          return num;
+        };
 
-        const { error: unitsError } = await supabase.from('developments').insert(unitsToInsert);
-        if (unitsError) {
-          console.error("Erro detalhado do Supabase:", unitsError);
-          alert(`A construtora foi salva, mas as unidades falharam: ${unitsError.message} (${unitsError.details})`);
+        const unitsToInsert = extractedUnits
+          .filter((u: any) => u && (u.title || u.price_starting_at))
+          .map((unit: any) => {
+            const rawStatus = String(unit.status || '').toLowerCase();
+            const isUnavailable = rawStatus.includes('unavail') || rawStatus.includes('vend') || rawStatus.includes('reser');
+            
+            let area = cleanNumber(unit.sq_ft);
+            if (area > 1000 && !String(unit.sq_ft).includes('.') && !String(unit.sq_ft).includes(',')) {
+              area = area / 100;
+            }
+
+            let bedrooms = Number(unit.bedrooms);
+            if (isNaN(bedrooms) || bedrooms === 0) {
+              bedrooms = 1;
+              if (unit.unit_type) {
+                const match = unit.unit_type.match(/(\d+)\s*[Dd]/);
+                if (match) bedrooms = parseInt(match[1]);
+              }
+            }
+            bedrooms = Math.max(1, bedrooms);
+
+            return {
+              title: `${String(unit.title || "Unidade").trim()}${isUnavailable ? ' (INDISPONÍVEL)' : ''}`,
+              sq_ft: area,
+              price_starting_at: cleanNumber(unit.price_starting_at),
+              status: 'available',
+              bedrooms: bedrooms,
+              bathrooms: Math.max(0, Number(unit.bathrooms) || 0),
+              parking_spaces: Math.max(0, Number(unit.parking_spaces) || 0),
+              has_garage: (Number(unit.parking_spaces) || 0) > 0,
+              near_beach: false,
+              has_deed: false,
+              description: String(unit.description || "Unidade importada via PDF").trim(),
+              builder_id: builderIdToUse,
+              user_id: user.id,
+              location: (data.address || "Localização pendente").trim(), 
+              hero_image_url: "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?q=80&w=2070&auto=format&fit=crop"
+            };
+          });
+
+        console.log(`Iniciando inserção garantida de ${unitsToInsert.length} unidades...`);
+        
+        let successCount = 0;
+        let firstError = null;
+
+        for (const unit of unitsToInsert) {
+          const { error: unitsError } = await supabase.from('developments').insert([unit]);
+          if (unitsError) {
+            console.error("Falha na unidade:", unit.title, unitsError);
+            if (!firstError) firstError = unitsError;
+          } else {
+            successCount++;
+          }
+        }
+
+        if (firstError) {
+          alert(`Importação parcial: ${successCount} unidades salvas. Erro na primeira falha: ${firstError.message}`);
+        } else {
+          alert(`Sucesso total! ${successCount} unidades importadas.`);
         }
       }
 
-      navigate("/builders");
+      navigate(extractedUnits.length > 0 ? "/project-developments" : "/builders");
     } catch (error) {
       console.error("Error saving builder:", error);
       alert(isEditing ? "Failed to update builder." : "Failed to register builder.");
@@ -226,49 +290,6 @@ export const RegisterBuilder = () => {
                 <InputField label={t('builders.email')} type="email" {...register("email")} error={errors.email?.message} placeholder="contact@company.com" />
                 <InputField label={t('builders.phone')} type="tel" {...register("phone")} error={errors.phone?.message} placeholder="+1 (555) 000-0000" />
                 <InputField label={t('builders.address')} {...register("address")} error={errors.address?.message} className="md:col-span-2" placeholder="123 Builder Ave" />
-              </div>
-            </div>
-
-            <div className="bg-surface-container-lowest rounded-lg p-6 sunken-shadow relative z-10 space-y-6">
-              <h3 className="font-headline text-lg font-bold text-primary flex items-center border-b border-surface-container pb-4">
-                <span className="material-symbols-outlined mr-2">upload_file</span>
-                Importar Unidades (Opcional)
-              </h3>
-              <p className="font-body text-xs text-on-surface-variant">
-                Selecione um PDF com a tabela de unidades para cadastrá-las automaticamente.
-              </p>
-              
-              <div className="flex flex-col gap-4">
-                <label className={`
-                  flex flex-col items-center justify-center w-full h-32 
-                  border-2 border-dashed rounded-lg cursor-pointer 
-                  transition-colors duration-200
-                  ${processingPdf ? 'border-primary/50 bg-primary/5' : 'border-surface-container-highest hover:bg-surface-container-high'}
-                `}>
-                  <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                    {processingPdf ? (
-                      <>
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mb-3"></div>
-                        <p className="text-sm text-primary font-medium animate-pulse">Processando com IA...</p>
-                      </>
-                    ) : (
-                      <>
-                        <span className="material-symbols-outlined text-3xl text-on-surface-variant mb-2">picture_as_pdf</span>
-                        <p className="text-sm text-on-surface-variant"><span className="font-semibold">Clique para subir</span> ou arraste o PDF</p>
-                      </>
-                    )}
-                  </div>
-                  <input type="file" className="hidden" accept=".pdf" onChange={handlePdfUpload} disabled={processingPdf} />
-                </label>
-
-                {extractedUnits.length > 0 && (
-                  <div className="bg-tertiary-container/20 p-4 rounded-lg flex items-center gap-3 border border-tertiary-container/30">
-                    <span className="material-symbols-outlined text-tertiary">task_alt</span>
-                    <p className="text-sm font-medium text-on-tertiary-container">
-                      {extractedUnits.length} unidades encontradas e prontas para importação!
-                    </p>
-                  </div>
-                )}
               </div>
             </div>
 

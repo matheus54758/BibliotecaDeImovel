@@ -1,9 +1,10 @@
-import { NavLink, Link } from 'react-router-dom';
+import { NavLink, Link, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { cn } from '../lib/utils';
 
 export const SideNavBar = () => {
   const { t } = useTranslation();
+  const location = useLocation();
 
   const navItems = [
     { name: t('nav.overview'), icon: 'dashboard', path: '/' },
@@ -13,6 +14,24 @@ export const SideNavBar = () => {
     { name: t('nav.consultancy'), icon: 'business_center', path: '/consultancy' },
   ];
 
+  const isPathActive = (path: string) => {
+    const currentPath = location.pathname;
+    
+    if (path === '/') return currentPath === '/';
+    
+    // Projetos (Aba /project-developments)
+    if (path === '/project-developments') {
+      return currentPath.startsWith('/project-developments') || currentPath.startsWith('/projects');
+    }
+    
+    // Imóveis (Aba /developments)
+    if (path === '/developments') {
+      return currentPath === '/developments' || currentPath.startsWith('/units');
+    }
+    
+    return currentPath.startsWith(path);
+  };
+
   return (
     <nav className="hidden md:flex flex-col h-screen w-64 fixed left-0 top-0 bg-surface-container-low py-8 z-50">
       <div className="px-8 mb-12">
@@ -20,23 +39,25 @@ export const SideNavBar = () => {
         <p className="text-sm text-on-surface/60 font-body">{t('nav.consultant_pro')}</p>
       </div>
       <div className="flex-1 px-4 space-y-2">
-        {navItems.map((item) => (
-          <NavLink
-            key={item.path}
-            to={item.path}
-            className={({ isActive }) =>
-              cn(
+        {navItems.map((item) => {
+          const isActive = isPathActive(item.path);
+          
+          return (
+            <Link
+              key={item.path}
+              to={item.path}
+              className={cn(
                 "flex items-center px-4 py-3 transition-colors font-label",
                 isActive
                   ? "text-primary font-bold border-r-4 border-primary bg-surface-container-high"
                   : "text-on-surface/60 hover:bg-surface-container-high"
-              )
-            }
-          >
-            <span className="material-symbols-outlined mr-3">{item.icon}</span>
-            {item.name}
-          </NavLink>
-        ))}
+              )}
+            >
+              <span className="material-symbols-outlined mr-3">{item.icon}</span>
+              {item.name}
+            </Link>
+          );
+        })}
       </div>
       <div className="px-6 mt-auto">
         <Link to="/developments/new">

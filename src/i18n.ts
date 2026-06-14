@@ -148,7 +148,8 @@ const resources = {
         "available": "Available",
         "pre_launch": "Pre-Launch",
         "under_construction": "Under Construction",
-        "unavailable": "Unavailable"
+        "reserved": "Reserved",
+        "sold": "Sold"
       },
       "login": {
         "title": "Lumis - Inteligência Imobiliária",
@@ -335,7 +336,8 @@ const resources = {
         "available": "Disponível",
         "pre_launch": "Pré-Lançamento",
         "under_construction": "Em Construção",
-        "unavailable": "Indisponível"
+        "reserved": "Reservado",
+        "sold": "Vendido"
       },
       "login": {
         "title": "Lumis - Inteligência Imobiliária",
@@ -509,7 +511,9 @@ const resources = {
       "status": {
         "available": "Disponible",
         "pre_launch": "Pre-Lanzamiento",
-        "under_construction": "En Construcción"
+        "under_construction": "En Construcción",
+        "unavailable": "Indisponible",
+        "sold": "Vendido"
       },
       "login": {
         "title": "Lumis - Inteligência Imobiliária",

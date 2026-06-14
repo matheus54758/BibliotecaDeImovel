@@ -17,11 +17,12 @@ export const Dashboard = () => {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
 
-        // Fetch latest property added
+        // Fetch latest property added (only top-level buildings)
         const { data: latestProp } = await supabase
           .from('developments')
           .select('id, title, created_at, hero_image_url')
           .eq('user_id', user.id)
+          .is('parent_id', null) // Filtra para mostrar apenas o prédio
           .order('created_at', { ascending: false })
           .limit(1)
           .maybeSingle();

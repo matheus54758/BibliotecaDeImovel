@@ -52,7 +52,8 @@ export const useUserTier = () => {
         supabase
           .from('developments')
           .select('*', { count: 'exact', head: true })
-          .eq('user_id', user.id),
+          .eq('user_id', user.id)
+          .is('parent_id', null),
       ]);
 
       setCounts({

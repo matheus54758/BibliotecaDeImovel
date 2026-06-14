@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { supabase } from "../lib/supabase";
 import { Link, useSearchParams, useLocation } from "react-router-dom";
-import { formatCurrency } from "../lib/utils";
+import { formatCurrency, formatNumber } from "../lib/utils";
 
 export const Developments = () => {
   const { t } = useTranslation();
@@ -28,6 +28,7 @@ export const Developments = () => {
           .from('developments')
           .select('*')
           .eq('user_id', user.id)
+          .is('parent_id', null) // Mostra apenas os prédios (pais)
           .order('created_at', { ascending: false });
 
         if (builderId) {
@@ -100,7 +101,7 @@ export const Developments = () => {
       <section className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8 mb-24">
         {developments.length > 0 ? (
           developments.map((dev) => (
-            <Link key={dev.id} to={`/developments/${dev.id}`}>
+            <Link key={dev.id} to={isProjectsView ? `/projects/${dev.id}` : `/units/${dev.id}`}>
               <article
                 className="group rounded-xl overflow-hidden bg-surface-container-low hover:bg-surface-bright transition-all duration-300 relative sunken-shadow h-full"
               >
@@ -110,8 +111,12 @@ export const Developments = () => {
                     alt={dev.title}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
                   />
-                  <div className="absolute top-4 left-4 bg-tertiary-container text-on-tertiary text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider">
-                    {t(`status.${dev.status}`)}
+                  <div className={`absolute top-4 left-4 text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider ${
+                    dev.title?.includes('(INDISPONÍVEL)') 
+                      ? 'bg-error/10 text-error border border-error/20' 
+                      : 'bg-tertiary-container text-on-tertiary'
+                  }`}>
+                    {dev.title?.includes('(INDISPONÍVEL)') ? t('status.unavailable') : t(`status.${dev.status}`)}
                   </div>
                 </div>
                 <div className="p-6 relative">
@@ -120,26 +125,9 @@ export const Developments = () => {
                       <p className="text-xs font-bold text-primary uppercase tracking-wider mb-1">{dev.location}</p>
                       <h3 className="text-xl font-headline font-bold text-on-background">{dev.title}</h3>
                     </div>
-                    <div className="text-right">
-                      <p className="text-xs text-on-surface-variant font-medium">{t('common.starting_at')}</p>
-                      <p className="text-lg font-headline font-extrabold text-primary">
-                        {dev.price_starting_at ? formatCurrency(dev.price_starting_at) : t('common.consult')}
-                      </p>
-                    </div>
                   </div>
-                  <div className="pt-8 mt-4 grid grid-cols-3 gap-4 border-t border-surface-container-highest/50">
-                    <div className="flex flex-col items-center">
-                      <span className="material-symbols-outlined text-on-surface-variant mb-1 text-sm">bed</span>
-                      <span className="text-sm font-semibold text-on-surface">{dev.bedrooms} {t('developments.beds')}</span>
-                    </div>
-                    <div className="flex flex-col items-center border-l border-r border-surface-container-highest/50">
-                      <span className="material-symbols-outlined text-on-surface-variant mb-1 text-sm">shower</span>
-                      <span className="text-sm font-semibold text-on-surface">{dev.bathrooms} {t('developments.baths')}</span>
-                    </div>
-                    <div className="flex flex-col items-center">
-                      <span className="material-symbols-outlined text-on-surface-variant mb-1 text-sm">square_foot</span>
-                      <span className="text-sm font-semibold text-on-surface">{dev.sq_ft}m²</span>
-                    </div>
+                  <div className="pt-8 mt-4">
+                    {/* Espaçador para manter o design consistente após remover as métricas */}
                   </div>
                 </div>
               </article>
