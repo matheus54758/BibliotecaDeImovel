@@ -16,7 +16,6 @@ export const NewDevelopment = () => {
   const [searchParams] = useSearchParams();
   const isEditing = Boolean(id);
   const [isStandaloneProperty, setIsStandaloneProperty] = useState(searchParams.get("type") === "property");
-  const isProjectMode = searchParams.get("type") === "project";
   const parentIdFromUrl = searchParams.get("parentId");
   
   const [builders, setBuilders] = useState<any[]>([]);
