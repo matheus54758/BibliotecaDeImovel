@@ -35,9 +35,6 @@ export const RegisterBuilder = () => {
 
   const logoUrl = watch("logo_url");
 
-  const [extractedUnits, setExtractedUnits] = useState<any[]>([]);
-  const [processingPdf, setProcessingPdf] = useState(false);
-
   useEffect(() => {
     if (isEditing) {
       async function fetchBuilder() {
@@ -63,40 +60,6 @@ export const RegisterBuilder = () => {
     }
   }, [id, isEditing, reset, navigate, t]);
 
-  const handlePdfUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    setProcessingPdf(true);
-    try {
-      const arrayBuffer = await file.arrayBuffer();
-
-      const { data, error } = await supabase.functions.invoke('process-pdf-units', {
-        body: arrayBuffer,
-        headers: {
-          'Content-Type': 'application/pdf'
-        }
-      });
-
-      if (error) {
-        console.error("Erro na função:", error);
-        throw new Error("Erro no servidor do Supabase. Verifique os logs das Edge Functions.");
-      }
-
-      if (data.error) {
-        throw new Error(data.details || data.error);
-      }
-      
-      setExtractedUnits(data || []);
-      alert(`Sucesso! Encontramos ${data.length} unidades no PDF.`);
-    } catch (error: any) {
-      console.error("Error processing PDF:", error);
-      alert("Falha ao processar PDF: " + error.message);
-    } finally {
-      setProcessingPdf(false);
-    }
-  };
-
   const onSubmit = async (data: BuilderInput) => {
     if (!isEditing && !canAddBuilder) {
       alert(t('freemium.builder_limit_desc'));
@@ -114,8 +77,6 @@ export const RegisterBuilder = () => {
         user_id: user.id
       };
 
-      let builderIdToUse = id;
-
       if (isEditing) {
         const { error } = await supabase
           .from('builders')
@@ -124,95 +85,11 @@ export const RegisterBuilder = () => {
         
         if (error) throw error;
       } else {
-        const { data: newBuilder, error } = await supabase.from('builders').insert([{ ...builderData, status: 'active' }]).select().single();
+        const { error } = await supabase.from('builders').insert([{ ...builderData, status: 'active' }]);
         if (error) throw error;
-        builderIdToUse = newBuilder.id;
       }
 
-      // If we have extracted units, save them now
-      if (extractedUnits.length > 0 && builderIdToUse) {
-        const cleanNumber = (val: any) => {
-          if (!val) return 0;
-          let str = String(val).replace(/R\$/g, '').trim();
-          
-          if (str.includes(',') && str.includes('.')) {
-            str = str.replace(/\./g, '');
-          }
-          
-          str = str.replace(',', '.');
-          
-          const parts = str.split('.');
-          if (parts.length > 2) {
-            str = parts.slice(0, -1).join('') + '.' + parts[parts.length - 1];
-          }
-
-          const num = parseFloat(str.replace(/[^-0-9.]/g, '')) || 0;
-          return num;
-        };
-
-        const unitsToInsert = extractedUnits
-          .filter((u: any) => u && (u.title || u.price_starting_at))
-          .map((unit: any) => {
-            const rawStatus = String(unit.status || '').toLowerCase();
-            const isUnavailable = rawStatus.includes('unavail') || rawStatus.includes('vend') || rawStatus.includes('reser');
-            
-            let area = cleanNumber(unit.sq_ft);
-            if (area > 1000 && !String(unit.sq_ft).includes('.') && !String(unit.sq_ft).includes(',')) {
-              area = area / 100;
-            }
-
-            let bedrooms = Number(unit.bedrooms);
-            if (isNaN(bedrooms) || bedrooms === 0) {
-              bedrooms = 1;
-              if (unit.unit_type) {
-                const match = unit.unit_type.match(/(\d+)\s*[Dd]/);
-                if (match) bedrooms = parseInt(match[1]);
-              }
-            }
-            bedrooms = Math.max(1, bedrooms);
-
-            return {
-              title: `${String(unit.title || "Unidade").trim()}${isUnavailable ? ' (INDISPONÍVEL)' : ''}`,
-              sq_ft: area,
-              price_starting_at: cleanNumber(unit.price_starting_at),
-              status: 'available',
-              bedrooms: bedrooms,
-              bathrooms: Math.max(0, Number(unit.bathrooms) || 0),
-              parking_spaces: Math.max(0, Number(unit.parking_spaces) || 0),
-              has_garage: (Number(unit.parking_spaces) || 0) > 0,
-              near_beach: false,
-              has_deed: false,
-              description: String(unit.description || "Unidade importada via PDF").trim(),
-              builder_id: builderIdToUse,
-              user_id: user.id,
-              location: (data.address || "Localização pendente").trim(), 
-              hero_image_url: "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?q=80&w=2070&auto=format&fit=crop"
-            };
-          });
-
-        console.log(`Iniciando inserção garantida de ${unitsToInsert.length} unidades...`);
-        
-        let successCount = 0;
-        let firstError = null;
-
-        for (const unit of unitsToInsert) {
-          const { error: unitsError } = await supabase.from('developments').insert([unit]);
-          if (unitsError) {
-            console.error("Falha na unidade:", unit.title, unitsError);
-            if (!firstError) firstError = unitsError;
-          } else {
-            successCount++;
-          }
-        }
-
-        if (firstError) {
-          alert(`Importação parcial: ${successCount} unidades salvas. Erro na primeira falha: ${firstError.message}`);
-        } else {
-          alert(`Sucesso total! ${successCount} unidades importadas.`);
-        }
-      }
-
-      navigate(extractedUnits.length > 0 ? "/project-developments" : "/builders");
+      navigate("/builders");
     } catch (error) {
       console.error("Error saving builder:", error);
       alert(isEditing ? "Failed to update builder." : "Failed to register builder.");
@@ -255,7 +132,7 @@ export const RegisterBuilder = () => {
               
               <MediaUpload 
                 label={t('builders.form.logo')}
-                onUpload={(url) => setValue("logo_url", url, { shouldValidate: true })}
+                onUpload={(url) => setValue("logo_url", Array.isArray(url) ? url[0] : url, { shouldValidate: true })}
                 previewUrl={logoUrl}
                 accept="image"
               />

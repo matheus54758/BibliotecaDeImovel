@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { supabase } from "../lib/supabase";
 import { Link, useSearchParams, useLocation } from "react-router-dom";
-import { formatCurrency, formatNumber } from "../lib/utils";
 
 export const Developments = () => {
   const { t } = useTranslation();
@@ -69,7 +68,13 @@ export const Developments = () => {
 
   return (
     <div className="max-w-7xl mx-auto">
-      <section className="mb-16 mt-8 flex flex-col md:flex-row justify-between items-end gap-8">
+      <nav className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant/40 mt-8 mb-2 font-body">
+        <Link to="/" className="hover:text-primary transition-colors">{t('nav.overview')}</Link>
+        <span className="material-symbols-outlined text-[10px]">chevron_right</span>
+        <span className="text-primary/60">{isProjectsView ? t('nav.project_developments') : t('nav.developments')}</span>
+      </nav>
+
+      <section className="mb-16 mt-0 flex flex-col md:flex-row justify-between items-end gap-8">
         <div className="max-w-2xl">
           <h2 className="text-4xl md:text-5xl font-headline font-extrabold text-on-surface tracking-tight mb-4 leading-tight">
             {title} <br />
@@ -82,7 +87,7 @@ export const Developments = () => {
           </p>
         </div>
         <div className="flex gap-4 w-full md:w-auto">
-          <Link to={`/developments/new${isProjectsView ? '?type=project' : ''}`}>
+          <Link to={isProjectsView ? "/projects/new?type=project" : "/units/new?type=property"}>
             <button className="flex-1 md:flex-none bg-gradient-primary text-on-primary font-body font-medium py-2.5 px-6 rounded-lg hover:opacity-90 transition-opacity flex items-center justify-center gap-2">
               <span className="material-symbols-outlined text-sm">add</span>
               {isProjectsView ? t('developments.new_project') : t('developments.new_asset')}

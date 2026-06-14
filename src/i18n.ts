@@ -18,6 +18,7 @@ const resources = {
         "consultancy": "Consultancy",
         "analytics": "Analytics",
         "settings": "Settings",
+        "library": "Property Library",
         "new_development": "New Property",
         "new_project_development": "New Development",
         "ledger": "Lumis - Inteligência Imobiliária",
@@ -168,9 +169,25 @@ const resources = {
       "consultancy": {
         "subtitle": "Find the ideal property by filtering by characteristics and value.",
         "max_price": "Maximum Value (R$)",
+        "search_by_type": "Search by Type",
         "features": "Features (Tags)",
         "clear_filters": "Clear Filters",
-        "no_results": "No properties found with these filters."
+        "no_results": "No properties found with these filters.",
+        "types": {
+          "dormitory": "Apartment",
+          "studio": "Studio",
+          "commercial": "Commercial",
+          "house": "House"
+        },
+        "tags": {
+          "is_penthouse": "Penthouse",
+          "has_balcony_grill": "Balcony w/ Grill",
+          "is_furnished": "Furnished",
+          "has_sea_view": "Sea View",
+          "is_pet_friendly": "Pet Friendly",
+          "has_complete_leisure": "Full Leisure",
+          "has_automation": "Automation"
+        }
       },
       "specialization": {
         "luxury_residential": "Luxury Residential",
@@ -204,6 +221,7 @@ const resources = {
         "consultancy": "Consultoria",
         "analytics": "Análise",
         "settings": "Configurações",
+        "library": "Biblioteca de Imóveis",
         "new_development": "Novo Imóvel",
         "new_project_development": "Novo Empreendimento",
         "ledger": "Lumis - Inteligência Imobiliária",
@@ -356,9 +374,25 @@ const resources = {
       "consultancy": {
         "subtitle": "Encontre o imóvel ideal filtrando por características e valor.",
         "max_price": "Valor Máximo (R$)",
+        "search_by_type": "Busca por Tipo",
         "features": "Características (Tags)",
         "clear_filters": "Limpar Filtros",
-        "no_results": "Nenhum imóvel encontrado com esses filtros."
+        "no_results": "Nenhum imóvel encontrado com esses filtros.",
+        "types": {
+          "dormitory": "Apartamento",
+          "studio": "Studio / Kitnet",
+          "commercial": "Comercial",
+          "house": "Casa / Sobrado"
+        },
+        "tags": {
+          "is_penthouse": "Cobertura",
+          "has_balcony_grill": "Sacada c/ Churrasqueira",
+          "is_furnished": "Mobiliado",
+          "has_sea_view": "Vista para o Mar",
+          "is_pet_friendly": "Pet Friendly",
+          "has_complete_leisure": "Lazer Completo",
+          "has_automation": "Automação"
+        }
       },
       "specialization": {
         "luxury_residential": "Residencial de Luxo",
@@ -532,9 +566,25 @@ const resources = {
       "consultancy": {
         "subtitle": "Encuentre el inmueble ideal filtrando por características e valor.",
         "max_price": "Valor Máximo (R$)",
+        "search_by_type": "Buscar por Tipo",
         "features": "Características (Tags)",
         "clear_filters": "Limpar Filtros",
-        "no_results": "No se encontraron inmuebles com estos filtros."
+        "no_results": "No se encontraron inmuebles com estos filtros.",
+        "types": {
+          "dormitory": "Apartamento",
+          "studio": "Studio",
+          "commercial": "Comercial",
+          "house": "Casa"
+        },
+        "tags": {
+          "is_penthouse": "Ático",
+          "has_balcony_grill": "Balcón con Parrilla",
+          "is_furnished": "Amueblado",
+          "has_sea_view": "Vista al Mar",
+          "is_pet_friendly": "Pet Friendly",
+          "has_complete_leisure": "Ocio Completo",
+          "has_automation": "Automatización"
+        }
       },
       "specialization": {
         "luxury_residential": "Residencial de Lujo",

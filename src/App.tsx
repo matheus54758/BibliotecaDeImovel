@@ -24,6 +24,9 @@ function App() {
             <Route path="/" element={<Dashboard />} />
             <Route path="/project-developments" element={<Developments />} />
             <Route path="/developments" element={<Developments />} />
+            <Route path="/developments/new" element={<NewDevelopment />} />
+            <Route path="/developments/:id" element={<PropertyDetails />} />
+            <Route path="/developments/edit/:id" element={<NewDevelopment />} />
             
             {/* New Distinct Routes */}
             <Route path="/projects/:id" element={<PropertyDetails />} />

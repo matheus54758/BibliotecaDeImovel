@@ -23,7 +23,8 @@ serve(async (req) => {
       
       CAMPOS OBRIGATÓRIOS:
       - title: "Apto 101"
-      - unit_type: "2 Dormitórios Leste" (Se encontrar "1D", "2D", etc no PDF, converta para "1 Dormitório", "2 Dormitórios", etc)
+      - unit_type: Classifique em um destes 4: "dormitory" (para Apartamentos), "studio" (para Studios/Kitnets), "commercial" (para Salas/Lojas), "house" (para Casas/Sobrados).
+      - description: Descrição curta (ex: "2 Dormitórios Leste", "Sala 02", etc)
       - sq_ft: área total (ex: 26.48). No PDF pode estar como "26,48" ou "2648", converta SEMPRE para float com PONTO DECIMAL. 
       - price_starting_at: valor total
       - bedrooms: extraia a quantidade numérica (mínimo 1). Se o PDF não disser, ou for Studio, coloque 1 por padrão.
@@ -33,17 +34,26 @@ serve(async (req) => {
       - payment_installment_count: qtd parcelas
       - payment_reinforcement_value: valor reforço
       - payment_reinforcement_count: qtd reforços
-      - payment_post_construction: saldo pós-obra
-      
+      - status: "Disponível", "Vendido" ou "Reservado"
+      - is_penthouse: true se no título ou descrição contiver "Cob", "Cobertura" ou "Penthouse".
+      - has_sea_view: true se contiver "Vista Mar", "Frente Mar" ou similar.
+      - has_garage: true se indicar vaga de garagem inclusa (Vaga, Garagem).
+      - is_furnished: true se contiver "Mobiliado", "Mobília" ou similar.
+      - is_pet_friendly: true se contiver "Pet Friendly", "Aceita Pets" ou similar.
+      - has_complete_leisure: true se contiver "Lazer Completo", "Área de Lazer" ou similar.
+      - has_automation: true se contiver "Automação", "Automado" ou similar.
+      - has_balcony_grill: true se contiver "Churrasqueira", "Sacada com Churrasqueira" ou similar.
+      - payment_entry: valor entrada
+      ...
       REGRAS IMPORTANTES:
       1. DECIMAL DA ÁREA: Se o número no PDF for algo como "2648" e parecer uma área de apartamento, entenda como "26.48". Áreas raramente passam de 1000.
       2. DORMITÓRIOS: Se não encontrar a informação de dormitórios, assuma que a unidade possui no mínimo 1. Nunca retorne 0.
       3. No campo 'unit_type', SEMPRE substitua a sigla "D" por "Dormitório(s)".
       4. STATUS: Se no PDF indicar que não está disponível, use "Reservado" ou "Vendido". No JSON retorne "reserved" ou "sold".
-      
-      RETORNE APENAS O ARRAY JSON [{},...]. SEM MARKDOWN. SEM TEXTO. COMPACTO.
-    `;
+      5. DIFERENCIAIS: Se encontrar "Cob", "Norte", "Sul" no título, mantenha a informação de orientação no título, mas extraia "is_penthouse: true" se encontrar menção a cobertura.
 
+      RETORNE APENAS O ARRAY JSON [{},...]. SEM MARKDOWN. SEM TEXTO. COMPACTO.
+      `;
     const response = await fetch(GEMINI_API_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

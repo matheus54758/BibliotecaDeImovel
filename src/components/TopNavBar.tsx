@@ -239,10 +239,10 @@ export const TopNavBar = () => {
         </div>
 
         <div className="p-6 mt-auto border-t border-surface-container-highest">
-          <Link to="/developments/new" onClick={() => setShowMobileMenu(false)}>
+          <Link to="/developments/new?type=property" onClick={() => setShowMobileMenu(false)}>
             <button className="w-full py-4 px-4 bg-primary text-on-primary rounded-xl font-bold shadow-lg shadow-primary/20 flex items-center justify-center gap-2">
               <span className="material-symbols-outlined">add</span>
-              {t('nav.new_development')}
+              {t('developments.new_asset')}
             </button>
           </Link>
         </div>

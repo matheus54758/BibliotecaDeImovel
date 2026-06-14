@@ -1,4 +1,4 @@
-import { NavLink, Link, useLocation } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { cn } from '../lib/utils';
 
@@ -16,17 +16,21 @@ export const SideNavBar = () => {
 
   const isPathActive = (path: string) => {
     const currentPath = location.pathname;
+    const searchParams = new URLSearchParams(location.search);
+    const type = searchParams.get('type');
     
     if (path === '/') return currentPath === '/';
     
     // Projetos (Aba /project-developments)
     if (path === '/project-developments') {
-      return currentPath.startsWith('/project-developments') || currentPath.startsWith('/projects');
+      const isProjectCreation = currentPath === '/developments/new' && type === 'project';
+      return currentPath.startsWith('/project-developments') || currentPath.startsWith('/projects') || isProjectCreation;
     }
     
     // Imóveis (Aba /developments)
     if (path === '/developments') {
-      return currentPath === '/developments' || currentPath.startsWith('/units');
+      const isPropertyCreation = currentPath === '/developments/new' && type === 'property';
+      return (currentPath.startsWith('/developments') && currentPath !== '/developments/new') || isPropertyCreation;
     }
     
     return currentPath.startsWith(path);
@@ -60,7 +64,7 @@ export const SideNavBar = () => {
         })}
       </div>
       <div className="px-6 mt-auto">
-        <Link to="/developments/new">
+        <Link to="/developments/new?type=property">
           <button className="w-full py-3 px-4 bg-gradient-primary text-on-primary rounded-md font-label font-medium hover:opacity-90 transition-opacity text-center">
             {t('nav.new_development')}
           </button>
