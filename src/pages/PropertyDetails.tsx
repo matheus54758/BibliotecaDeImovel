@@ -5,7 +5,6 @@ import { supabase } from "../lib/supabase";
 import { Button } from "../components/Button";
 import { formatCurrency, formatNumber } from "../lib/utils";
 import { generatePropertyPDF } from "../lib/pdf";
-import { InputField } from "../components/InputField";
 
 export const PropertyDetails = () => {
   const { t } = useTranslation();
@@ -19,7 +18,6 @@ export const PropertyDetails = () => {
   const [deleting, setDeleting] = useState(false);
   const [selectedMedia, setSelectedMedia] = useState<{url: string, type: 'image' | 'video'} | null>(null);
   const [processingPdf, setProcessingPdf] = useState(false);
-  const [showAddModal, setShowAddModal] = useState(false);
   
   const handlePdfUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -571,10 +569,10 @@ export const PropertyDetails = () => {
                           <span className="material-symbols-outlined text-xs">pool</span>
                           <span className="text-[10px] font-bold uppercase tracking-wider">Lazer</span>
                         </div>
-                        )}
-                        </div>
-                        )}
-                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
 
                 <div className="space-y-4 pt-6 border-t border-outline-variant/10">
                   <Button className="w-full py-4 text-lg font-bold flex items-center justify-center gap-2">{t('common.request_info')}<span className="material-symbols-outlined">arrow_forward</span></Button>
@@ -669,28 +667,6 @@ export const PropertyDetails = () => {
 
                         {unit.description && unit.description !== "Cadastro manual" && (
                           <p className="text-[10px] text-on-surface-variant/70 leading-relaxed italic line-clamp-2">
-                            {unit.description}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                    <div className="flex items-end justify-between border-t border-outline-variant/10 pt-4">
-                      <span className="text-xl font-headline font-black text-primary">{unit.price_starting_at ? formatCurrency(unit.price_starting_at) : t('common.consult')}</span>
-                      <Link to={`/units/${unit.id}`} state={{ isProject: false }} className="text-xs font-bold text-on-surface-variant hover:text-primary underline uppercase tracking-widest transition-colors">Detalhes</Link>
-                    </div>
-                  </article>
-                ))}
-              </div>
-            ) : (
-              <div className="py-20 text-center bg-surface-container-low/50 rounded-2xl border-2 border-dashed border-outline-variant/20"><span className="material-symbols-outlined text-6xl text-on-surface/10 mb-4 italic">apartment</span><p className="text-on-surface-variant font-body text-lg italic">Nenhuma unidade cadastrada neste empreendimento ainda.</p><p className="text-sm text-on-surface/40 mt-2">Use o botão acima para importar unidades via PDF.</p></div>
-            )}
-          </section>
-        </div>
-      )}
-    </div>
-  );
-};
- line-clamp-2">
                             {unit.description}
                           </p>
                         )}
