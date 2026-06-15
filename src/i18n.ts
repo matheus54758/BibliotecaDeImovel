@@ -200,8 +200,8 @@ const resources = {
       },
       "freemium": {
         "limit_reached": "Limit Reached",
-        "builder_limit_desc": "Free users can only add up to 10 builders. Upgrade to a paid plan for unlimited access.",
-        "development_limit_desc": "Free users can only add up to 10 properties. Upgrade to a paid plan for unlimited access.",
+        "builder_limit_desc": "Free users can only add up to 2 builders. Upgrade to a Pro plan for unlimited access.",
+        "development_limit_desc": "Free users can only add up to 5 properties. Upgrade to a Pro plan for unlimited access.",
         "upgrade_now": "Upgrade Now"
       }
     }
@@ -405,8 +405,8 @@ const resources = {
       },
       "freemium": {
         "limit_reached": "Limite Atingido",
-        "builder_limit_desc": "Usuários gratuitos podem adicionar até 10 construtoras. Faça upgrade para o plano pago para acesso ilimitado.",
-        "development_limit_desc": "Usuários gratuitos podem adicionar até 10 imóveis. Faça upgrade para o plano pago para acesso ilimitado.",
+        "builder_limit_desc": "Usuários gratuitos podem adicionar até 2 construtoras. Faça upgrade para o plano Pro para acesso ilimitado.",
+        "development_limit_desc": "Usuários gratuitos podem adicionar até 5 imóveis. Faça upgrade para o plano Pro para acesso ilimitado.",
         "upgrade_now": "Fazer Upgrade Agora"
       }
     }

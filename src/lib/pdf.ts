@@ -61,9 +61,25 @@ export const generatePropertyPDF = async (property: any, amenities: any[], galle
     doc.setFontSize(12);
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(100, 100, 100);
-    doc.text(property.location || "", 15, 168);
+    
+    // Construct full address
+    let fullAddress = "";
+    if (property.street || property.city || property.state) {
+      const parts = [];
+      if (property.street) parts.push(property.street);
+      if (property.city) parts.push(property.city);
+      
+      fullAddress = parts.join(", ");
+      if (property.state) {
+        fullAddress += fullAddress ? ` - ${property.state}` : property.state;
+      }
+    } else {
+      fullAddress = property.location || "";
+    }
 
-    if (property.price_starting_at > 0) {
+    doc.text(fullAddress, 15, 168);
+
+    if (property.price_starting_at > 0 && !isProject) {
       doc.setTextColor(gold[0], gold[1], gold[2]);
       doc.setFontSize(18);
       doc.setFont('helvetica', 'bold');
@@ -75,18 +91,22 @@ export const generatePropertyPDF = async (property: any, amenities: any[], galle
     doc.line(15, 185, 195, 185);
 
     // Stats
-    const statsHeader = ['Área', 'Dormitórios', 'Banheiros'];
-    const statsRow = [`${property.sq_ft}m²`, `${property.bedrooms || '0'}`, `${property.bathrooms || '0'}`];
-    autoTable(doc, {
-      startY: 190,
-      margin: { left: 15, right: 15 },
-      body: [statsHeader.map(h => ({ content: h, styles: { fontStyle: 'bold' } })), statsRow],
-      theme: 'plain',
-      styles: { fontSize: 11, cellPadding: 3, textColor: [0, 0, 0] },
-    });
+    let currentYAfterHeader = 185;
+    if (!isProject) {
+      const statsHeader = ['Área', 'Dormitórios', 'Banheiros'];
+      const statsRow = [`${property.sq_ft}m²`, `${property.bedrooms || '0'}`, `${property.bathrooms || '0'}`];
+      autoTable(doc, {
+        startY: 190,
+        margin: { left: 15, right: 15 },
+        body: [statsHeader.map(h => ({ content: h, styles: { fontStyle: 'bold' } })), statsRow],
+        theme: 'plain',
+        styles: { fontSize: 11, cellPadding: 3, textColor: [0, 0, 0] },
+      });
+      currentYAfterHeader = (doc as any).lastAutoTable.finalY;
+    }
 
     // Description (Multi-page)
-    let finalY = (doc as any).lastAutoTable.finalY + 10;
+    let finalY = currentYAfterHeader + 10;
     doc.setTextColor(black[0], black[1], black[2]);
     doc.setFontSize(14);
     doc.setFont('helvetica', 'bold');

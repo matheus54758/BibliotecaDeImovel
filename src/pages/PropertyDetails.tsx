@@ -18,10 +18,88 @@ export const PropertyDetails = () => {
   const [deleting, setDeleting] = useState(false);
   const [selectedMedia, setSelectedMedia] = useState<{url: string, type: 'image' | 'video'} | null>(null);
   const [processingPdf, setProcessingPdf] = useState(false);
-  
+  const [selling, setSelling] = useState(false);
+  const [isUpdateMode, setIsUpdateMode] = useState(false);
+  const [updateReport, setUpdateReport] = useState<{
+    unit: string;
+    oldPrice: number;
+    newPrice: number;
+    status: 'updated' | 'inserted' | 'no_change' | 'error';
+    error?: string;
+  }[] | null>(null);
+
+  const handleMarkAsSold = async () => {
+    if (!property || selling) return;
+    
+    const confirmMessage = property.parent_id 
+      ? `Confirmar venda da unidade ${property.title}?` 
+      : `Confirmar venda do imóvel ${property.title}?`;
+      
+    if (!window.confirm(confirmMessage)) return;
+
+    setSelling(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("User not authenticated");
+
+      const now = new Date();
+      const monthYear = now.toLocaleString('pt-BR', { month: 'long', year: 'numeric' });
+      const salePrice = property.price_starting_at || 0;
+
+      // 1. Atualizar status para Vendido
+      const { error: updateError } = await supabase
+        .from('developments')
+        .update({ status: 'sold' })
+        .eq('id', id);
+
+      if (updateError) throw updateError;
+
+      // 2. Registrar Receita
+      // Tenta buscar registro existente para o mês/ano
+      const { data: existingRevenue } = await supabase
+        .from('revenue_tracking')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('month_year', monthYear)
+        .maybeSingle();
+
+      if (existingRevenue) {
+        await supabase
+          .from('revenue_tracking')
+          .update({
+            total_revenue: (existingRevenue.total_revenue || 0) + salePrice,
+            sales_count: (existingRevenue.sales_count || 0) + 1,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', existingRevenue.id);
+      } else {
+        await supabase
+          .from('revenue_tracking')
+          .insert([{
+            user_id: user.id,
+            month_year: monthYear,
+            total_revenue: salePrice,
+            sales_count: 1
+          }]);
+      }
+
+      alert("Venda registrada com sucesso! Receita atualizada para " + monthYear);
+      setProperty({ ...property, status: 'sold' });
+    } catch (error: any) {
+      console.error("Erro ao registrar venda:", error);
+      alert("Erro ao registrar venda: " + error.message);
+    } finally {
+      setSelling(false);
+    }
+  };
+
   const handlePdfUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !id) return;
+
+    if (tier === 'free') {
+      alert("No plano gratuito, a IA de PDF é limitada para testes. Para processar tabelas ilimitadas e ter suporte prioritário, faça upgrade para o plano Pro!");
+    }
 
     setProcessingPdf(true);
     try {
@@ -106,14 +184,16 @@ export const PropertyDetails = () => {
 
         const finalType = normalizeType(unit.unit_type, unit.description);
         
+        const parking = Math.max(0, Number(unit.parking_spaces) || 0);
+        
         return {
           title: `${String(unit.title || "Unidade").trim()}${status === 'sold' ? ' (VENDIDO)' : status === 'reserved' ? ' (RESERVADO)' : ''}`,
           sq_ft: area,
           price_starting_at: cleanNumber(unit.price_starting_at),
           status: status,
           bedrooms: bedrooms,
-          bathrooms: Math.max(0, Number(unit.bathrooms) || 0),
-          parking_spaces: Math.max(0, Number(unit.parking_spaces) || 0),
+          bathrooms: Math.max(1, Number(unit.bathrooms) || 0),
+          parking_spaces: parking,
           unit_type: finalType,
           payment_entry: cleanNumber(unit.payment_entry),
           payment_installment_value: cleanNumber(unit.payment_installment_value),
@@ -126,10 +206,13 @@ export const PropertyDetails = () => {
           parent_id: id,
           user_id: user.id,
           location: property.location,
+          street: property.street,
+          city: property.city,
+          state: property.state,
           hero_image_url: property.hero_image_url,
           is_penthouse: !!unit.is_penthouse,
           has_sea_view: !!unit.has_sea_view,
-          has_garage: !!unit.has_garage || (Math.max(0, Number(unit.parking_spaces) || 0) > 0),
+          has_garage: !!unit.has_garage || parking > 0,
           is_furnished: !!unit.is_furnished,
           is_pet_friendly: !!unit.is_pet_friendly,
           has_complete_leisure: !!unit.has_complete_leisure,
@@ -140,19 +223,60 @@ export const PropertyDetails = () => {
 
       console.log("UNIDADES PREPARADAS PARA SALVAR:", unitsToInsert);
 
-      const totalFound = unitsToInsert.length;
+      // 1. Buscar unidades existentes para comparação
+      const { data: existingUnits } = await supabase
+        .from('developments')
+        .select('*')
+        .eq('parent_id', id);
+
+      const existingMap = new Map();
+      existingUnits?.forEach(u => existingMap.set(u.title, u));
+
+      const report: any[] = [];
       let successCount = 0;
-      
+
       for (const unit of unitsToInsert) {
-        const { error: insError } = await supabase.from('developments').insert([unit]);
-        if (!insError) {
-          successCount++;
+        const existing = existingMap.get(unit.title);
+
+        if (existing && isUpdateMode) {
+          // Comparar preços
+          const oldPrice = existing.price_starting_at || 0;
+          const newPrice = unit.price_starting_at || 0;
+
+          const { error: updError } = await supabase
+            .from('developments')
+            .update(unit)
+            .eq('id', existing.id);
+
+          if (!updError) {
+            successCount++;
+            report.push({
+              unit: unit.title,
+              oldPrice,
+              newPrice,
+              status: oldPrice === newPrice ? 'no_change' : 'updated'
+            });
+          } else {
+            report.push({ unit: unit.title, status: 'error', error: updError.message });
+          }
         } else {
-          console.error(`Erro ao salvar unidade ${unit.title}:`, insError);
+          // Inserir como novo
+          const { error: insError } = await supabase.from('developments').insert([unit]);
+          if (!insError) {
+            successCount++;
+            report.push({
+              unit: unit.title,
+              oldPrice: 0,
+              newPrice: unit.price_starting_at,
+              status: 'inserted'
+            });
+          } else {
+            report.push({ unit: unit.title, status: 'error', error: insError.message });
+          }
         }
       }
 
-      alert(`Processamento concluído!\nForam achadas ${totalFound} unidades e ${successCount} foram adicionadas com sucesso.`);
+      setUpdateReport(report);
       fetchSubUnits();
     } catch (error: any) {
       console.error("Error processing PDF:", error);
@@ -348,20 +472,26 @@ export const PropertyDetails = () => {
               <div className="space-y-6 text-on-surface-variant leading-relaxed text-lg font-body">
                 <p className="whitespace-pre-wrap">{property.description}</p>
                 {(isSubUnit || isStandaloneProperty) && (
-                  <div className="grid grid-cols-3 gap-8 pt-10 border-t border-outline-variant/10">
-                    <div className="flex flex-col">
-                      <span className="text-xs uppercase text-on-surface-variant/60 font-bold tracking-widest mb-1">Área Total</span>
-                      <span className="text-2xl font-headline font-bold text-primary">{formatNumber(property.sq_ft)}m²</span>
-                    </div>
-                    <div className="flex flex-col">
-                      <span className="text-xs uppercase text-on-surface-variant/60 font-bold tracking-widest mb-1">Dormitórios</span>
-                      <span className="text-2xl font-headline font-bold text-primary">{property.bedrooms || 0}</span>
-                    </div>
-                    <div className="flex flex-col">
-                      <span className="text-xs uppercase text-on-surface-variant/60 font-bold tracking-widest mb-1">Banheiros</span>
-                      <span className="text-2xl font-headline font-bold text-primary">{property.bathrooms || 0}</span>
-                    </div>
+                <div className="grid grid-cols-3 gap-8 pt-10 border-t border-outline-variant/10">
+                  <div className="flex flex-col">
+                    <span className="text-xs uppercase text-on-surface-variant/60 font-bold tracking-widest mb-1">Área Total</span>
+                    <span className="text-2xl font-headline font-bold text-primary">{formatNumber(property.sq_ft)}m²</span>
                   </div>
+                  <div className="flex flex-col">
+                    <span className="text-xs uppercase text-on-surface-variant/60 font-bold tracking-widest mb-1">Dormitórios</span>
+                    <span className="text-2xl font-headline font-bold text-primary">{property.bedrooms || 0}</span>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-xs uppercase text-on-surface-variant/60 font-bold tracking-widest mb-1">Banheiros</span>
+                    <span className="text-2xl font-headline font-bold text-primary">{property.bathrooms || 0}</span>
+                  </div>
+                  {!isSubUnit && property.parking_spaces > 0 && (
+                    <div className="flex flex-col">
+                      <span className="text-xs uppercase text-on-surface-variant/60 font-bold tracking-widest mb-1">Vagas</span>
+                      <span className="text-2xl font-headline font-bold text-primary">{property.parking_spaces}</span>
+                    </div>
+                  )}
+                </div>
                 )}
               </div>
             </section>
@@ -575,6 +705,16 @@ export const PropertyDetails = () => {
                 </div>
 
                 <div className="space-y-4 pt-6 border-t border-outline-variant/10">
+                  {property.status !== 'sold' && (
+                    <Button 
+                      onClick={handleMarkAsSold} 
+                      disabled={selling}
+                      className="w-full py-4 text-lg font-bold flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white"
+                    >
+                      <span className="material-symbols-outlined">{selling ? 'sync' : 'check_circle'}</span>
+                      {selling ? 'Registrando...' : (property.parent_id ? "Unidade Vendida" : "Imóvel Vendido")}
+                    </Button>
+                  )}
                   <Button className="w-full py-4 text-lg font-bold flex items-center justify-center gap-2">{t('common.request_info')}<span className="material-symbols-outlined">arrow_forward</span></Button>
                   <button onClick={() => generatePropertyPDF(property, amenities, gallery, subUnits)} className="w-full py-3 border-2 border-primary text-primary hover:bg-primary hover:text-on-primary transition-all rounded-md font-bold flex items-center justify-center gap-2"><span className="material-symbols-outlined">download</span>{t('common.download_pdf')}</button>
                 </div>
@@ -599,7 +739,19 @@ export const PropertyDetails = () => {
           <section className="bg-surface-container-lowest rounded-2xl p-8 sunken-shadow border border-outline-variant/10">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-10 border-b border-outline-variant/20 pb-6">
               <div><h2 className="text-3xl font-headline font-bold text-on-surface mb-2 tracking-tight">Unidades do Empreendimento</h2><p className="text-on-surface-variant font-body">Gerencie as unidades e quartos deste prédio aqui.</p></div>
-              <div className="flex flex-wrap gap-4">
+              <div className="flex flex-wrap gap-4 items-center">
+                <div className="flex items-center gap-2 px-4 py-2 bg-surface-container-high rounded-xl border border-outline-variant/30">
+                  <input 
+                    type="checkbox" 
+                    id="updateMode" 
+                    checked={isUpdateMode} 
+                    onChange={(e) => setIsUpdateMode(e.target.checked)}
+                    className="w-4 h-4 accent-primary cursor-pointer"
+                  />
+                  <label htmlFor="updateMode" className="text-[10px] font-black text-on-surface uppercase tracking-widest cursor-pointer select-none">
+                    Atualizar existentes
+                  </label>
+                </div>
                 <Link to={`/developments/new?parentId=${id}`} className="flex items-center gap-3 px-6 py-3 rounded-xl bg-primary text-on-primary font-bold uppercase tracking-wider hover:opacity-90 transition-all sunken-shadow">
                   <span className="material-symbols-outlined">add_circle</span>Adicionar Unidade
                 </Link>
@@ -683,6 +835,94 @@ export const PropertyDetails = () => {
               <div className="py-20 text-center bg-surface-container-low/50 rounded-2xl border-2 border-dashed border-outline-variant/20"><span className="material-symbols-outlined text-6xl text-on-surface/10 mb-4 italic">apartment</span><p className="text-on-surface-variant font-body text-lg italic">Nenhuma unidade cadastrada neste empreendimento ainda.</p><p className="text-sm text-on-surface/40 mt-2">Use o botão acima para importar unidades via PDF.</p></div>
             )}
           </section>
+        </div>
+      )}
+      {updateReport && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-300">
+          <div className="bg-surface-container-lowest w-full max-w-4xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh] sunken-shadow border border-outline-variant/10">
+            <div className="p-8 border-b border-outline-variant/10 flex justify-between items-center bg-surface-container-low">
+              <div>
+                <h2 className="text-2xl font-headline font-bold text-on-surface">Relatório de Processamento PDF</h2>
+                <p className="text-sm text-on-surface-variant font-body mt-1">Confira as alterações realizadas nas unidades.</p>
+              </div>
+              <button onClick={() => setUpdateReport(null)} className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-surface-container-high transition-colors">
+                <span className="material-symbols-outlined text-on-surface-variant">close</span>
+              </button>
+            </div>
+            
+            <div className="p-8 overflow-y-auto flex-1">
+              <div className="grid grid-cols-1 gap-4">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant/60 border-b border-outline-variant/20">
+                        <th className="py-4 px-2">Unidade</th>
+                        <th className="py-4 px-2">Status do Processo</th>
+                        <th className="py-4 px-2 text-right">Valor Anterior</th>
+                        <th className="py-4 px-2 text-right">Novo Valor</th>
+                        <th className="py-4 px-2 text-right">Variação</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-outline-variant/10">
+                      {updateReport.map((r, i) => {
+                        const diff = r.newPrice - r.oldPrice;
+                        const percent = r.oldPrice > 0 ? (diff / r.oldPrice) * 100 : 0;
+                        
+                        return (
+                          <tr key={i} className="group hover:bg-surface-container-low/50 transition-colors">
+                            <td className="py-4 px-2">
+                              <div className="font-bold text-on-surface group-hover:text-primary transition-colors">{r.unit}</div>
+                            </td>
+                            <td className="py-4 px-2">
+                              <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border ${
+                                r.status === 'updated' ? 'bg-blue-500/10 text-blue-500 border-blue-500/20' : 
+                                r.status === 'inserted' ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' :
+                                r.status === 'no_change' ? 'bg-surface-container-high text-on-surface-variant/60 border-outline-variant/20' : 'bg-red-500/10 text-red-500 border-red-500/20'
+                              }`}>
+                                {r.status === 'updated' ? 'Atualizado' : r.status === 'inserted' ? 'Nova Unidade' : r.status === 'no_change' ? 'Sem Alteração' : 'Erro'}
+                              </span>
+                            </td>
+                            <td className="py-4 px-2 text-right font-body text-on-surface-variant">
+                              {r.oldPrice > 0 ? formatCurrency(r.oldPrice) : '---'}
+                            </td>
+                            <td className="py-4 px-2 text-right font-headline font-bold text-on-surface">
+                              {formatCurrency(r.newPrice)}
+                            </td>
+                            <td className="py-4 px-2 text-right">
+                              {r.status === 'inserted' ? (
+                                <span className="text-[10px] font-black text-emerald-500 uppercase tracking-widest">Inaugural</span>
+                              ) : diff !== 0 ? (
+                                <div className={`flex flex-col items-end ${diff > 0 ? 'text-red-500' : 'text-emerald-500'}`}>
+                                  <span className="text-xs font-bold">{diff > 0 ? '↑' : '↓'} {formatCurrency(Math.abs(diff))}</span>
+                                  <span className="text-[10px] font-black uppercase tracking-tighter opacity-80">{percent > 0 ? '+' : ''}{percent.toFixed(1)}%</span>
+                                </div>
+                              ) : (
+                                <span className="text-on-surface-variant/30 text-xs">---</span>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+            
+            <div className="p-8 bg-surface-container-low border-t border-outline-variant/10 flex justify-between items-center">
+              <div className="flex gap-4">
+                <div className="flex flex-col">
+                  <span className="text-[10px] font-black text-on-surface-variant/60 uppercase tracking-widest">Total Processado</span>
+                  <span className="text-xl font-headline font-bold text-on-surface">{updateReport.length}</span>
+                </div>
+                <div className="flex flex-col border-l border-outline-variant/20 pl-4">
+                  <span className="text-[10px] font-black text-emerald-500/60 uppercase tracking-widest">Sucesso</span>
+                  <span className="text-xl font-headline font-bold text-emerald-500">{updateReport.filter(r => r.status !== 'error').length}</span>
+                </div>
+              </div>
+              <Button onClick={() => setUpdateReport(null)} className="px-10 py-4 rounded-xl">Entendido</Button>
+            </div>
+          </div>
         </div>
       )}
     </div>

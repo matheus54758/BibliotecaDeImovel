@@ -10,6 +10,9 @@ import { NewDevelopment } from './pages/NewDevelopment';
 import { Consultancy } from './pages/Consultancy';
 import { ProtectedRoute } from './components/ProtectedRoute';
 
+import { Showcase } from './pages/Showcase';
+import { PropertyPublic } from './pages/PropertyPublic';
+
 function App() {
   return (
     <HashRouter>
@@ -17,6 +20,8 @@ function App() {
         {/* Public Routes */}
         <Route path="/login" element={<Login />} />
         <Route path="/register-public" element={<RegisterBuilder />} />
+        <Route path="/vitrine/:userId" element={<Showcase />} />
+        <Route path="/view/:id" element={<PropertyPublic />} />
         
         {/* Protected Routes */}
         <Route element={<ProtectedRoute />}>

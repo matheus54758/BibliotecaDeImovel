@@ -13,6 +13,12 @@ export const Consultancy = () => {
   const [maxPrice, setMaxPrice] = useState<string>("");
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [selectedType, setSelectedType] = useState<string>("");
+  const [selectedStatus, setSelectedStatus] = useState<string>("");
+  const [searchState, setSearchState] = useState<string>("");
+  const [searchCity, setSearchCity] = useState<string>("");
+  const [searchStreet, setSearchStreet] = useState<string>("");
+  const [streetSuggestions, setStreetSuggestions] = useState<string[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
 
   const propertyTypes = [
     { id: 'dormitory', label: t('consultancy.types.dormitory'), icon: 'apartment' },
@@ -36,7 +42,36 @@ export const Consultancy = () => {
 
   useEffect(() => {
     fetchFilteredProperties();
-  }, [selectedTags, maxPrice, selectedType]);
+  }, [selectedTags, maxPrice, selectedType, selectedStatus, searchState, searchCity, searchStreet]);
+
+  // Street Autocomplete Logic
+  useEffect(() => {
+    const fetchSuggestions = async () => {
+      if (searchStreet.length < 1) {
+        setStreetSuggestions([]);
+        return;
+      }
+      
+      try {
+        const { data, error } = await supabase
+          .from('developments')
+          .select('street')
+          .ilike('street', `${searchStreet}%`)
+          .not('street', 'is', null)
+          .limit(20);
+        
+        if (!error && data) {
+          const uniqueStreets = Array.from(new Set(data.map(d => d.street))).filter(Boolean) as string[];
+          setStreetSuggestions(uniqueStreets);
+        }
+      } catch (err) {
+        console.error("Error fetching street suggestions:", err);
+      }
+    };
+
+    const timer = setTimeout(fetchSuggestions, 300);
+    return () => clearTimeout(timer);
+  }, [searchStreet]);
 
   async function fetchFilteredProperties() {
     setLoading(true);
@@ -63,6 +98,11 @@ export const Consultancy = () => {
         query = query.eq('unit_type', selectedType);
       }
 
+      // Apply status filter
+      if (selectedStatus) {
+        query = query.eq('status', selectedStatus);
+      }
+
       // Apply tag filters
       selectedTags.forEach(tag => {
         query = query.eq(tag, true);
@@ -71,6 +111,17 @@ export const Consultancy = () => {
       // Apply price filter
       if (maxPrice && !isNaN(parseFloat(maxPrice))) {
         query = query.lte('price_starting_at', parseFloat(maxPrice));
+      }
+
+      // Apply Location Filters
+      if (searchState.trim()) {
+        query = query.ilike('state', `%${searchState.trim()}%`);
+      }
+      if (searchCity.trim()) {
+        query = query.ilike('city', `%${searchCity.trim()}%`);
+      }
+      if (searchStreet.trim()) {
+        query = query.ilike('street', `%${searchStreet.trim()}%`);
       }
 
       const { data, error } = await query;
@@ -109,25 +160,35 @@ export const Consultancy = () => {
       {/* Filters Section */}
       <section className="bg-surface-container-lowest p-6 rounded-2xl sunken-shadow mb-12 space-y-8 mx-4 md:mx-0">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-end">
-          {/* Price Filter */}
-          <div className="lg:col-span-3 space-y-2">
+          {/* Status Filter */}
+          <div className="lg:col-span-4 space-y-2">
             <label className="block text-sm font-label font-bold text-on-surface uppercase tracking-wider">
-              {t('consultancy.max_price')}
+              Status da Unidade
             </label>
-            <div className="relative">
-              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-on-surface/50 font-body">R$</span>
-              <input
-                type="number"
-                value={maxPrice}
-                onChange={(e) => setMaxPrice(e.target.value)}
-                placeholder="Ex: 500000"
-                className="w-full bg-surface-container-high border-0 rounded-xl py-3 pl-12 pr-4 text-on-surface focus:ring-2 focus:ring-primary/20 transition-all font-body"
-              />
+            <div className="flex flex-wrap gap-2">
+              {[
+                { id: 'available', label: 'Disponível', color: 'bg-emerald-500', icon: 'check_circle' },
+                { id: 'reserved', label: 'Reservado', color: 'bg-amber-500', icon: 'schedule' },
+                { id: 'sold', label: 'Vendido', color: 'bg-red-500', icon: 'sell' },
+              ].map((status) => (
+                <button
+                  key={status.id}
+                  onClick={() => setSelectedStatus(prev => prev === status.id ? "" : status.id)}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-full border-2 transition-all font-body text-xs font-medium ${
+                    selectedStatus === status.id
+                      ? `border-transparent text-white shadow-lg ${status.color}`
+                      : 'bg-surface-container-high border-transparent text-on-surface-variant hover:border-outline-variant'
+                  }`}
+                >
+                  <span className="material-symbols-outlined text-base">{status.icon}</span>
+                  {status.label}
+                </button>
+              ))}
             </div>
           </div>
 
           {/* Type Filter */}
-          <div className="lg:col-span-9 space-y-2">
+          <div className="lg:col-span-8 space-y-2">
             <label className="block text-sm font-label font-bold text-on-surface uppercase tracking-wider">
               {t('consultancy.search_by_type')}
             </label>
@@ -147,6 +208,61 @@ export const Consultancy = () => {
                 </button>
               ))}
             </div>
+          </div>
+        </div>
+
+        {/* Location Filters */}
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-6 pt-4 border-t border-surface-container-high">
+          <div className="md:col-span-2 space-y-2">
+            <label className="block text-sm font-label font-bold text-on-surface uppercase tracking-wider">Estado</label>
+            <input
+              type="text"
+              value={searchState}
+              onChange={(e) => setSearchState(e.target.value)}
+              placeholder="Ex: SC"
+              className="w-full bg-surface-container-high border-0 rounded-xl py-3 px-4 text-on-surface focus:ring-2 focus:ring-primary/20 transition-all font-body"
+            />
+          </div>
+          <div className="md:col-span-4 space-y-2">
+            <label className="block text-sm font-label font-bold text-on-surface uppercase tracking-wider">Cidade</label>
+            <input
+              type="text"
+              value={searchCity}
+              onChange={(e) => setSearchCity(e.target.value)}
+              placeholder="Ex: Balneário Camboriú"
+              className="w-full bg-surface-container-high border-0 rounded-xl py-3 px-4 text-on-surface focus:ring-2 focus:ring-primary/20 transition-all font-body"
+            />
+          </div>
+          <div className="md:col-span-6 space-y-2 relative">
+            <label className="block text-sm font-label font-bold text-on-surface uppercase tracking-wider">Rua / Bairro</label>
+            <input
+              type="text"
+              value={searchStreet}
+              onChange={(e) => {
+                setSearchStreet(e.target.value);
+                setShowSuggestions(true);
+              }}
+              onFocus={() => setShowSuggestions(true)}
+              onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
+              placeholder="Ex: Rua das Flores"
+              className="w-full bg-surface-container-high border-0 rounded-xl py-3 px-4 text-on-surface focus:ring-2 focus:ring-primary/20 transition-all font-body"
+            />
+            {showSuggestions && streetSuggestions.length > 0 && (
+              <ul className="absolute z-10 w-full bg-surface-container-lowest mt-1 rounded-xl shadow-xl border border-outline-variant max-h-60 overflow-auto">
+                {streetSuggestions.map((suggestion, index) => (
+                  <li
+                    key={index}
+                    onClick={() => {
+                      setSearchStreet(suggestion);
+                      setShowSuggestions(false);
+                    }}
+                    className="px-4 py-3 hover:bg-surface-container-high cursor-pointer text-on-surface font-body text-sm border-b border-outline-variant/30 last:border-0"
+                  >
+                    {suggestion}
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
         </div>
 
@@ -174,10 +290,18 @@ export const Consultancy = () => {
         </div>
         
         {/* Reset Button */}
-        {(maxPrice || selectedTags.length > 0 || selectedType) && (
+        {(maxPrice || selectedTags.length > 0 || selectedType || selectedStatus || searchState || searchCity || searchStreet) && (
           <div className="flex justify-end pt-2">
             <button 
-              onClick={() => { setMaxPrice(""); setSelectedTags([]); setSelectedType(""); }}
+              onClick={() => { 
+                setMaxPrice(""); 
+                setSelectedTags([]); 
+                setSelectedType(""); 
+                setSelectedStatus("");
+                setSearchState(""); 
+                setSearchCity(""); 
+                setSearchStreet(""); 
+              }}
               className="flex items-center gap-1 text-primary text-sm font-bold hover:underline"
             >
               <span className="material-symbols-outlined text-sm">filter_alt_off</span>

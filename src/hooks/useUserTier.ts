@@ -10,8 +10,8 @@ export interface TierLimits {
 
 const LIMITS: Record<UserTier, TierLimits> = {
   free: {
-    builders: 10,
-    developments: 10,
+    builders: 2,
+    developments: 5,
   },
   paid: {
     builders: Infinity,

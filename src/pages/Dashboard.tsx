@@ -2,11 +2,42 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { supabase } from "../lib/supabase";
 import { useUserTier } from "../hooks/useUserTier";
+import { formatCurrency } from "../lib/utils";
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend,
+  Filler,
+} from 'chart.js';
+import { Line } from 'react-chartjs-2';
+
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend,
+  Filler
+);
 
 export const Dashboard = () => {
   const { t } = useTranslation();
   const { tier, counts, loading: tierLoading, refresh } = useUserTier();
   const [activities, setActivities] = useState<any[]>([]);
+  const [revenueData, setRevenueData] = useState<any[]>([]);
+  const [stats, setStats] = useState({
+    builders: 0,
+    projects: 0,
+    units: 0,
+    properties: 0
+  });
   const [loading, setLoading] = useState(true);
   const [showPricing, setShowPricing] = useState(false);
   const [pixData, setPixData] = useState<{ qr_code: string, qr_code_base64: string, copy_paste: string } | null>(null);
@@ -17,25 +48,59 @@ export const Dashboard = () => {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
 
-        // Fetch latest property added (only top-level buildings)
+        // 1. Fetch Stats
+        const [buildersRes, developmentsRes] = await Promise.all([
+          supabase.from('builders').select('id', { count: 'exact', head: true }).eq('user_id', user.id),
+          supabase.from('developments').select('id, parent_id, builder_id').eq('user_id', user.id)
+        ]);
+
+        const devData = developmentsRes.data || [];
+        const projects = devData.filter(d => d.parent_id === null && d.builder_id !== null).length;
+        const units = devData.filter(d => d.parent_id !== null).length;
+        const properties = devData.filter(d => d.parent_id === null && d.builder_id === null).length;
+
+        setStats({
+          builders: buildersRes.count || 0,
+          projects,
+          units,
+          properties
+        });
+
+        // 2. Fetch Revenue for Chart
+        const { data: revenue } = await supabase
+          .from('revenue_tracking')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: true });
+        
+        setRevenueData(revenue || []);
+
+        // 3. Fetch Activities
+        const recentActivities: any[] = [];
+
+        // Latest Additions
         const { data: latestProp } = await supabase
           .from('developments')
-          .select('id, title, created_at, hero_image_url')
+          .select('id, title, created_at, hero_image_url, parent_id')
           .eq('user_id', user.id)
-          .is('parent_id', null) // Filtra para mostrar apenas o prédio
           .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
+          .limit(3);
 
-        if (latestProp) {
-          setActivities([{
-            id: latestProp.id,
-            type: t('dashboard.recent_activities'), // Usando uma tradução existente ou texto direto
-            description: latestProp.title,
-            created_at: latestProp.created_at,
-            image: latestProp.hero_image_url
-          }]);
-        }
+        latestProp?.forEach(p => {
+          recentActivities.push({
+            id: p.id,
+            type: 'addition',
+            label: p.parent_id ? 'Nova Unidade' : 'Novo Imóvel/Projeto',
+            description: p.title,
+            created_at: p.created_at,
+            image: p.hero_image_url,
+            icon: 'add_circle',
+            color: 'bg-emerald-500/10 text-emerald-500'
+          });
+        });
+
+        setActivities(recentActivities.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()));
+
       } catch (error) {
         console.error("Error fetching dashboard data:", error);
       }
@@ -46,6 +111,45 @@ export const Dashboard = () => {
       fetchDashboardData();
     }
   }, [tierLoading, t]);
+
+  const chartData = {
+    labels: revenueData.map(d => d.month_year.split(' de ')[0]), // Pega só o mês
+    datasets: [
+      {
+        fill: true,
+        label: 'Receita Mensal',
+        data: revenueData.map(d => d.total_revenue),
+        borderColor: 'rgb(59, 130, 246)',
+        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+        tension: 0.4,
+        pointRadius: 6,
+        pointBackgroundColor: 'rgb(59, 130, 246)',
+      },
+    ],
+  };
+
+  const chartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        callbacks: {
+          label: (context: any) => formatCurrency(context.raw)
+        }
+      }
+    },
+    scales: {
+      y: {
+        beginAtZero: true,
+        ticks: {
+          callback: (value: any) => formatCurrency(value)
+        },
+        grid: { color: 'rgba(0,0,0,0.05)' }
+      },
+      x: { grid: { display: false } }
+    }
+  };
 
   // Polling para verificar se o pagamento foi aprovado
   useEffect(() => {
@@ -87,24 +191,18 @@ export const Dashboard = () => {
     }
   };
 
-  const handlePixUpgrade = async (priceId: string, amount: number, description: string) => {
+  const handleShareShowcase = async () => {
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
-
-      setLoading(true);
-      const { data, error } = await supabase.functions.invoke('create-mercadopago-payment', {
-        body: { priceId, amount, description }
-      });
-
-      if (error) throw error;
-      setPixData(data);
-      setShowPricing(false);
-    } catch (error) {
-      console.error("Error creating PIX payment:", error);
-      alert("Falha ao gerar código PIX.");
-    } finally {
-      setLoading(false);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      
+      const baseUrl = window.location.href.split('#')[0];
+      const showcaseUrl = `${baseUrl}#/vitrine/${user.id}`;
+      
+      await navigator.clipboard.writeText(showcaseUrl);
+      alert("Link da sua Vitrine copiado para a área de transferência!");
+    } catch (err) {
+      console.error("Erro ao copiar link:", err);
     }
   };
 
@@ -207,7 +305,7 @@ export const Dashboard = () => {
 
       {pixData && (
         <div className="fixed inset-0 bg-on-surface/50 backdrop-blur-sm z-[110] flex items-center justify-center p-4">
-          <div className="bg-surface-container-lowest rounded-2xl p-8 max-w-md w-full sunken-shadow relative text-center">
+          <div className="bg-surface-container-lowest rounded-2xl p-8 max-md w-full sunken-shadow relative text-center">
             <button 
               onClick={() => setPixData(null)}
               className="absolute top-6 right-6 text-on-surface-variant hover:text-on-surface"
@@ -255,15 +353,22 @@ export const Dashboard = () => {
       <div className="mb-12 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h2 className="text-4xl font-headline font-bold text-on-surface tracking-tight mb-2">
-            {t('dashboard.title')}
+            Dashboard
           </h2>
           <p className="text-on-surface/70 font-body text-lg">
-            {t('dashboard.subtitle')}
+            Bem-vindo de volta! Aqui está um resumo do seu portfólio.
           </p>
         </div>
         <div className="flex items-center gap-4">
+          <button 
+            onClick={handleShareShowcase}
+            className="flex items-center gap-2 px-6 py-2 rounded-full font-bold bg-primary/10 text-primary hover:bg-primary/20 transition-all border border-primary/20 shadow-sm"
+          >
+            <span className="material-symbols-outlined text-lg">share</span>
+            Compartilhar Vitrine
+          </button>
           <div className={`px-4 py-2 rounded-full font-label text-sm font-bold uppercase tracking-widest ${tier === 'paid' ? 'bg-primary text-on-primary' : 'bg-surface-container-high text-on-surface-variant'}`}>
-            {tier === 'paid' ? 'Paid Plan' : 'Free Plan'}
+            {tier === 'paid' ? 'Premium' : 'Gratuito'}
           </div>
           {tier === 'free' && (
             <button 
@@ -271,70 +376,95 @@ export const Dashboard = () => {
               className="bg-tertiary text-on-tertiary px-6 py-2 rounded-full font-bold hover:opacity-90 transition-opacity flex items-center gap-2"
             >
               <span className="material-symbols-outlined text-sm">workspace_premium</span>
-              {t('freemium.upgrade_now')}
+              Fazer Upgrade
             </button>
           )}
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-12">
-        <MetricCard title={t('dashboard.metrics.total_builders')} value={counts.builders} icon="engineering" />
-        <MetricCard title={t('dashboard.metrics.active_projects')} value={counts.developments} icon="apartment" />
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
+        <MetricCard title="Construtoras" value={stats.builders} icon="engineering" color="text-blue-500" />
+        <MetricCard title="Empreendimentos" value={stats.projects} icon="apartment" color="text-indigo-500" />
+        <MetricCard title="Unidades" value={stats.units} icon="meeting_room" color="text-emerald-500" />
+        <MetricCard title="Imóveis" value={stats.properties} icon="home" color="text-amber-500" />
       </div>
 
-      <div className="bg-surface-container-low rounded-xl p-8">
-        <h3 className="text-2xl font-headline font-bold text-on-surface mb-8">{t('dashboard.recent_activities')}</h3>
-        <div className="space-y-6">
-          {activities.length > 0 ? (
-            activities.map((act) => (
-              <ActivityItem 
-                key={act.id}
-                desc={act.description} 
-                time={new Date(act.created_at).toLocaleDateString()} 
-                icon="description" 
-                iconColor="text-primary" 
-                bgColor="bg-primary/10"
-                image={act.image}
-              />
-            ))
-          ) : (
-            <p className="text-on-surface/50 text-sm italic">{t('dashboard.no_activities')}</p>
-          )}
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-8 mb-12">
+        <div className="xl:col-span-2 bg-surface-container-lowest rounded-3xl p-8 sunken-shadow border border-outline-variant/10">
+          <div className="flex justify-between items-center mb-8">
+            <h3 className="text-xl font-headline font-bold text-on-surface">Desempenho de Vendas</h3>
+            <div className="flex items-center gap-2 text-xs font-bold text-emerald-500 uppercase tracking-widest bg-emerald-500/10 px-3 py-1 rounded-full">
+              <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+              Atualizado
+            </div>
+          </div>
+          <div className="h-[300px] w-full">
+            {revenueData.length > 0 ? (
+              <Line data={chartData} options={chartOptions} />
+            ) : (
+              <div className="h-full flex flex-col items-center justify-center text-on-surface/30 italic">
+                <span className="material-symbols-outlined text-4xl mb-2">bar_chart</span>
+                Nenhuma venda registrada ainda
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="bg-surface-container-lowest rounded-3xl p-8 sunken-shadow border border-outline-variant/10">
+          <h3 className="text-xl font-headline font-bold text-on-surface mb-8">Atividades Recentes</h3>
+          <div className="space-y-6">
+            {activities.length > 0 ? (
+              activities.map((act) => (
+                <ActivityItem 
+                  key={act.id}
+                  label={act.label}
+                  desc={act.description} 
+                  time={new Date(act.created_at).toLocaleDateString()} 
+                  icon={act.icon} 
+                  iconColor={act.color} 
+                  image={act.image}
+                />
+              ))
+            ) : (
+              <p className="text-on-surface/50 text-sm italic">Nenhuma atividade recente</p>
+            )}
+          </div>
         </div>
       </div>
     </>
   );
 };
 
-const MetricCard = ({ title, value, icon }: any) => (
-  <div className="bg-surface-container-lowest rounded-xl p-8 hover:bg-surface-bright transition-colors duration-300 relative overflow-hidden group sunken-shadow">
+const MetricCard = ({ title, value, icon, color }: any) => (
+  <div className="bg-surface-container-lowest rounded-2xl p-6 hover:bg-surface-bright transition-all duration-300 relative overflow-hidden group sunken-shadow border border-outline-variant/10">
     <div className="relative z-10">
-      <p className="text-on-surface/60 font-label text-sm uppercase tracking-wider mb-2">{title}</p>
-      <p className="text-5xl font-headline font-bold text-on-surface mb-4">{value}</p>
+      <div className={`w-10 h-10 rounded-xl bg-surface-container-high flex items-center justify-center mb-4 ${color}`}>
+        <span className="material-symbols-outlined">{icon}</span>
+      </div>
+      <p className="text-on-surface-variant font-bold text-xs uppercase tracking-widest mb-1">{title}</p>
+      <p className="text-3xl font-headline font-black text-on-surface">{value}</p>
     </div>
-    <div className="absolute -right-4 -bottom-4 opacity-5 group-hover:opacity-10 transition-opacity duration-500">
-      <span className="material-symbols-outlined text-9xl">{icon}</span>
+    <div className="absolute -right-2 -bottom-2 opacity-5 group-hover:opacity-10 transition-all duration-500 group-hover:scale-110">
+      <span className="material-symbols-outlined text-7xl">{icon}</span>
     </div>
   </div>
 );
 
-const ActivityItem = ({ desc, time, icon, iconColor, bgColor, image }: any) => (
-  <div className="flex items-center bg-surface-container-lowest p-6 rounded-xl hover:shadow-lg transition-all duration-300 border border-outline-variant/30">
+const ActivityItem = ({ label, desc, time, icon, iconColor, image }: any) => (
+  <div className="flex items-start gap-4 group cursor-pointer">
     {image ? (
-      <img src={image} alt={desc} className="w-24 h-24 rounded-lg object-cover mr-6 shadow-sm" />
+      <div className="w-12 h-12 rounded-xl overflow-hidden shrink-0 shadow-sm border border-outline-variant/20">
+        <img src={image} alt={desc} className="w-full h-full object-cover transition-transform group-hover:scale-110" />
+      </div>
     ) : (
-      <div className={`${bgColor} p-4 rounded-xl mr-6`}>
-        <span className={`material-symbols-outlined text-3xl ${iconColor}`}>{icon}</span>
+      <div className={`w-12 h-12 rounded-xl shrink-0 flex items-center justify-center bg-surface-container-high ${iconColor}`}>
+        <span className="material-symbols-outlined">{icon}</span>
       </div>
     )}
-    <div className="flex-1">
-      {/* Removemos o 'title' (tipo da atividade) para evitar repetição */}
-      <p className="font-headline font-bold text-xl text-on-surface">{desc}</p>
-      <p className="text-sm text-on-surface/50 mt-1 font-body flex items-center gap-1">
-        <span className="material-symbols-outlined text-xs">calendar_today</span>
-        {time}
-      </p>
+    <div className="flex-1 min-w-0">
+      <p className="text-[10px] font-black text-on-surface-variant/60 uppercase tracking-widest">{label}</p>
+      <p className="font-bold text-on-surface truncate group-hover:text-primary transition-colors">{desc}</p>
+      <p className="text-[10px] text-on-surface/40 font-medium">{time}</p>
     </div>
-    <span className="material-symbols-outlined text-on-surface/20">chevron_right</span>
   </div>
 );

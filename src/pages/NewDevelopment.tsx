@@ -40,6 +40,9 @@ export const NewDevelopment = () => {
       status: "available",
       hero_image_url: "",
       location: "",
+      street: "",
+      city: "",
+      state: "",
       title: "",
       price_starting_at: 1,
       sq_ft: 1,
@@ -83,6 +86,9 @@ export const NewDevelopment = () => {
           status: "available",
           hero_image_url: "",
           location: "",
+          street: "",
+          city: "",
+          state: "",
           title: "",
           price_starting_at: 1,
           sq_ft: 1,
@@ -136,7 +142,41 @@ export const NewDevelopment = () => {
             setIsStandaloneProperty(false);
           }
 
-          reset(propData);
+          // Parse location string into street, city, state
+          // Prioritize separate columns if they have data
+          let street = propData.street || "";
+          let city = propData.city || "";
+          let state = propData.state || "";
+          
+          if (!street && !city && !state && propData.location) {
+            // Expected format: "Street, City - State"
+            const parts = propData.location.split(" - ");
+            if (parts.length === 2) {
+              state = parts[1];
+              const streetCity = parts[0].split(", ");
+              if (streetCity.length === 2) {
+                street = streetCity[0];
+                city = streetCity[1];
+              } else {
+                street = parts[0];
+              }
+            } else {
+              const streetCity = propData.location.split(", ");
+              if (streetCity.length === 2) {
+                street = streetCity[0];
+                city = streetCity[1];
+              } else {
+                street = propData.location;
+              }
+            }
+          }
+
+          reset({
+            ...propData,
+            street,
+            city,
+            state
+          });
           setParentId(propData.parent_id);
           setVideoUrls(propData.video_url || []);
           setFloorPlans(propData.floor_plan_url || []);
@@ -163,19 +203,44 @@ export const NewDevelopment = () => {
 
       // Build the base data object
       let finalLocation = data.location;
+      
+      // If it's a development or standalone property, combine the fields
+      if (!parentId) {
+        const parts = [];
+        if (data.street) parts.push(data.street);
+        if (data.city) parts.push(data.city);
+        
+        finalLocation = parts.join(", ");
+        if (data.state) {
+          finalLocation += ` - ${data.state}`;
+        }
+      }
+
+      let finalStreet = data.street;
+      let finalCity = data.city;
+      let finalState = data.state;
+
       if (parentId && !finalLocation) {
         const { data: parentData } = await supabase
           .from('developments')
-          .select('location')
+          .select('location, street, city, state')
           .eq('id', parentId)
           .single();
-        if (parentData) finalLocation = parentData.location;
+        if (parentData) {
+          finalLocation = parentData.location;
+          finalStreet = parentData.street;
+          finalCity = parentData.city;
+          finalState = parentData.state;
+        }
       }
 
       const developmentData: any = {
         builder_id: isStandaloneProperty ? null : (data.builder_id || null),
         title: data.title,
         location: finalLocation || "Consulte-nos",
+        street: finalStreet || null,
+        city: finalCity || null,
+        state: finalState || null,
         hero_image_url: data.hero_image_url || null,
         status: data.status || 'available',
         price_starting_at: data.price_starting_at || 0,
@@ -348,14 +413,34 @@ export const NewDevelopment = () => {
                 placeholder={parentId || isStandaloneProperty ? "Ex: Apto 101" : "Ex: Edifício Harmony"}
               />
 
-              {!parentId && (
-                <InputField 
-                  label="Localização / Endereço"
-                  {...register("location")}
-                  error={errors.location?.message}
-                  placeholder="Cidade, Bairro ou Endereço Completo"
-                />
-              )}
+              {!parentId ? (
+                <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
+                  <div className="md:col-span-6">
+                    <InputField 
+                      label="Rua / Bairro"
+                      {...register("street")}
+                      error={errors.street?.message}
+                      placeholder="Ex: Rua das Flores, Centro"
+                    />
+                  </div>
+                  <div className="md:col-span-4">
+                    <InputField 
+                      label="Cidade"
+                      {...register("city")}
+                      error={errors.city?.message}
+                      placeholder="Ex: Balneário Camboriú"
+                    />
+                  </div>
+                  <div className="md:col-span-2">
+                    <InputField 
+                      label="Estado"
+                      {...register("state")}
+                      error={errors.state?.message}
+                      placeholder="Ex: SC"
+                    />
+                  </div>
+                </div>
+              ) : null}
 
               <div className="space-y-2">
                 <label className="block font-label text-sm font-medium text-on-surface">
