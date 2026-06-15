@@ -5,11 +5,13 @@ import { supabase } from "../lib/supabase";
 import { Button } from "../components/Button";
 import { formatCurrency, formatNumber } from "../lib/utils";
 import { generatePropertyPDF } from "../lib/pdf";
+import { useUserTier } from "../hooks/useUserTier";
 
 export const PropertyDetails = () => {
   const { t } = useTranslation();
   const { id } = useParams();
   const navigate = useNavigate();
+  const { tier } = useUserTier();
   const [property, setProperty] = useState<any>(null);
   const [amenities, setAmenities] = useState<any[]>([]);
   const [gallery, setGallery] = useState<any[]>([]);

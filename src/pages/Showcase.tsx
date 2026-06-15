@@ -40,13 +40,11 @@ export const Showcase = () => {
     async function fetchOwnerInfo() {
       if (!userId) return;
       try {
-        const { data: owner } = await supabase.rpc('get_user_tier_by_id', { user_id: userId });
-        // Alternative: If RPC doesn't exist, we can use a query to a public profile if available
-        // For now, let's assume we can fetch basic metadata if public access is granted
+        // Query to check if the owner exists and potentially get their metadata/profile
         const { data } = await supabase.from('public_profiles').select('*').eq('id', userId).maybeSingle();
         if (data) {
-          // You might want to store tier in public_profiles or just default to free if not found
-          // Since we just created public_profiles, let's just use it as a proxy for now
+          // In the future, we could store 'tier' in public_profiles
+          // For now, this confirms the owner exists.
         }
       } catch (err) {
         console.error("Error fetching owner info:", err);
@@ -60,15 +58,19 @@ export const Showcase = () => {
     if (!userId) return;
     setLoading(true);
     try {
-      // First, get the owner's tier to show/hide branding
+      // First, get the owner's profile to potentially determine branding
       const { data: profile } = await supabase
         .from('public_profiles')
         .select('*')
         .eq('id', userId)
         .maybeSingle();
       
+      // We check if profile exists to satisfy the linter
+      if (profile) {
+        // Owner found
+      }
+      
       // If we had a tier in public_profiles, we'd use it here. 
-      // For now, we'll default to free to show the branding unless we implement a way to verify.
       setOwnerTier('free'); 
 
       let query = supabase

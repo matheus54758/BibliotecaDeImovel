@@ -29,7 +29,7 @@ ChartJS.register(
 
 export const Dashboard = () => {
   const { t } = useTranslation();
-  const { tier, counts, loading: tierLoading, refresh } = useUserTier();
+  const { tier, loading: tierLoading, refresh } = useUserTier();
   const [activities, setActivities] = useState<any[]>([]);
   const [revenueData, setRevenueData] = useState<any[]>([]);
   const [stats, setStats] = useState({
@@ -188,6 +188,27 @@ export const Dashboard = () => {
     } catch (error) {
       console.error("Error creating checkout session:", error);
       alert("Falha ao iniciar processo de pagamento.");
+    }
+  };
+
+  const handlePixUpgrade = async (priceId: string, amount: number, description: string) => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      setLoading(true);
+      const { data, error } = await supabase.functions.invoke('create-mercadopago-payment', {
+        body: { priceId, amount, description }
+      });
+
+      if (error) throw error;
+      setPixData(data);
+      setShowPricing(false);
+    } catch (error) {
+      console.error("Error creating PIX payment:", error);
+      alert("Falha ao gerar código PIX.");
+    } finally {
+      setLoading(false);
     }
   };
 
