@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { useForm } from "react-hook-form";
+import { useForm, type SubmitHandler } from "react-hook-form";
 import { useTranslation } from "react-i18next";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { supabase } from "../lib/supabase";
@@ -41,7 +41,7 @@ export const RegisterLand = () => {
       price_starting_at: 0,
       sq_ft: 0,
       description: "",
-      unit_type: "land",
+      type: "land",
       video_url: [],
       floor_plan_url: [],
       ebook_url: [],
@@ -79,7 +79,7 @@ export const RegisterLand = () => {
     fetchData();
   }, [id, isEditing, reset, navigate]);
 
-  const onSubmit = async (data: DevelopmentInput) => {
+  const onSubmit: SubmitHandler<DevelopmentInput> = async (data) => {
     setLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -93,8 +93,8 @@ export const RegisterLand = () => {
 
       const landData = {
         ...data,
-        location: finalLocation,
-        unit_type: 'land',
+        location: finalLocation || data.location || "Consulte-nos",
+        unit_type: 'land', // Database uses unit_type, schema uses type
         user_id: user.id,
         video_url: videoUrls,
         floor_plan_url: floorPlans,
@@ -102,6 +102,9 @@ export const RegisterLand = () => {
         builder_id: null,
         parent_id: null
       };
+
+      // Remove the 'type' field which is for schema/UI but not in the main database columns as such (we use unit_type)
+      delete (landData as any).type;
 
       if (isEditing) {
         const { error } = await supabase
@@ -152,7 +155,7 @@ export const RegisterLand = () => {
             <InputField label="Título da Área (Ex: Lote 04 - Alphaville)" {...register("title")} error={errors.title?.message} placeholder="Dê um nome para facilitar a identificação" />
             <div className="space-y-2">
               <label className="block font-label text-sm font-medium text-on-surface">Status de Venda</label>
-              <select {...register("status")} className="w-full bg-surface-container-high border-0 rounded-xl py-3 px-4 text-on-surface focus:ring-2 focus:ring-primary/20 appearance-none">
+              <select {...register("status")} className="w-full bg-surface-container-high border-0 rounded-xl py-3 px-4 text-on-surface focus:ring-2 focus:ring-primary/20 appearance-none font-body">
                 <option value="available">Disponível</option>
                 <option value="reserved">Reservado</option>
                 <option value="sold">Vendido</option>
@@ -189,7 +192,7 @@ export const RegisterLand = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
               <label className="block font-label text-sm font-medium text-on-surface">Topografia (Relevo)</label>
-              <select className="w-full bg-surface-container-high border-0 rounded-xl py-3 px-4 text-on-surface focus:ring-2 focus:ring-primary/20 appearance-none">
+              <select className="w-full bg-surface-container-high border-0 rounded-xl py-3 px-4 text-on-surface focus:ring-2 focus:ring-primary/20 appearance-none font-body">
                 <option value="flat">Plano</option>
                 <option value="sloped_up">Aclive (Sobe)</option>
                 <option value="sloped_down">Declive (Desce)</option>
@@ -198,7 +201,7 @@ export const RegisterLand = () => {
             </div>
             <div className="space-y-2">
               <label className="block font-label text-sm font-medium text-on-surface">Zoneamento / Uso</label>
-              <select className="w-full bg-surface-container-high border-0 rounded-xl py-3 px-4 text-on-surface focus:ring-2 focus:ring-primary/20 appearance-none">
+              <select className="w-full bg-surface-container-high border-0 rounded-xl py-3 px-4 text-on-surface focus:ring-2 focus:ring-primary/20 appearance-none font-body">
                 <option value="residential">Residencial</option>
                 <option value="commercial">Comercial</option>
                 <option value="industrial">Industrial</option>
@@ -239,7 +242,7 @@ export const RegisterLand = () => {
 
           <div className="space-y-2">
             <label className="block font-label text-sm font-medium text-on-surface">Observações de Negociação (Aceita permuta, parcelamento direto...)</label>
-            <textarea {...register("description")} rows={4} className="w-full bg-surface-container-high border-0 rounded-2xl py-3 px-4 text-on-surface focus:ring-2 focus:ring-primary/20 transition-colors" placeholder="Ex: Estuda permuta por veículo ou imóvel de menor valor..."></textarea>
+            <textarea {...register("description")} rows={4} className="w-full bg-surface-container-high border-0 rounded-2xl py-3 px-4 text-on-surface focus:ring-2 focus:ring-primary/20 transition-colors font-body" placeholder="Ex: Estuda permuta por veículo ou imóvel de menor valor..."></textarea>
           </div>
         </div>
 

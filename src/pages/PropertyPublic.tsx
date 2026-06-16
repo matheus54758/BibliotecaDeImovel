@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { supabase } from "../lib/supabase";
 import { Button } from "../components/Button";
 import { formatCurrency, formatNumber } from "../lib/utils";
 import { generatePropertyPDF } from "../lib/pdf";
 
 export const PropertyPublic = () => {
+  const { t } = useTranslation();
   const { id } = useParams();
   const navigate = useNavigate();
   const [property, setProperty] = useState<any>(null);

@@ -1,12 +1,11 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { supabase } from "../lib/supabase";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { formatCurrency, formatNumber } from "../lib/utils";
 
 export const Lands = () => {
   const { t } = useTranslation();
-  const [searchParams] = useSearchParams();
   const [lands, setLands] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 

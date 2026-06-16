@@ -1,6 +1,6 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { formatCurrency } from './utils';
+import { formatCurrency, formatNumber } from './utils';
 
 export const generatePropertyPDF = async (property: any, amenities: any[], gallery: any[], subUnits: any[] = []) => {
   console.log("Iniciando geração de PDF para:", property.title);

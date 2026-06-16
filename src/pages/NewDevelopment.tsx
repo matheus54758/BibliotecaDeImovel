@@ -69,7 +69,6 @@ export const NewDevelopment = () => {
   });
 
   const heroImageUrl = watch("hero_image_url");
-  const selectedUnitType = watch("type");
 
   useEffect(() => {
     async function fetchData() {

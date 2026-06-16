@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { supabase } from "../lib/supabase";
-import { formatCurrency, formatNumber } from "../lib/utils";
+import { formatCurrency } from "../lib/utils";
 
 export const Showcase = () => {
   const { t } = useTranslation();
