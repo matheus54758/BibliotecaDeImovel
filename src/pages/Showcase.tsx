@@ -1,9 +1,11 @@
 import { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { supabase } from "../lib/supabase";
-import { formatCurrency } from "../lib/utils";
+import { formatCurrency, formatNumber } from "../lib/utils";
 
 export const Showcase = () => {
+  const { t } = useTranslation();
   const { userId } = useParams();
   const [properties, setProperties] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -11,16 +13,27 @@ export const Showcase = () => {
   
   // Filters
   const [maxPrice, setMaxPrice] = useState<string>("");
+  const [minSqFt, setMinSqFt] = useState<string>("");
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [selectedType, setSelectedType] = useState<string>("");
+  const [selectedDevType, setSelectedDevType] = useState<string>("");
   const [selectedStatus, setSelectedStatus] = useState<string>("");
   const [searchCity, setSearchCity] = useState<string>("");
+  const [searchState, setSearchState] = useState<string>("");
+  const [searchStreet, setSearchStreet] = useState<string>("");
 
   const propertyTypes = [
     { id: 'dormitory', label: 'Apartamento', icon: 'apartment' },
     { id: 'studio', label: 'Studio', icon: 'grid_view' },
     { id: 'commercial', label: 'Comercial', icon: 'storefront' },
     { id: 'house', label: 'Casa', icon: 'home' },
+  ];
+
+  const developmentTypes = [
+    { id: 'land', label: 'Terreno', icon: 'landscape' },
+    { id: 'mixed', label: 'Centro Empresarial e Residencial', icon: 'domain_add' },
+    { id: 'commercial_center', label: 'Centro Empresarial', icon: 'business_center' },
+    { id: 'residential_center', label: 'Centro Residencial', icon: 'apartment' },
   ];
 
   const tags = [
@@ -40,11 +53,9 @@ export const Showcase = () => {
     async function fetchOwnerInfo() {
       if (!userId) return;
       try {
-        // Query to check if the owner exists and potentially get their metadata/profile
         const { data } = await supabase.from('public_profiles').select('*').eq('id', userId).maybeSingle();
         if (data) {
-          // In the future, we could store 'tier' in public_profiles
-          // For now, this confirms the owner exists.
+          // Branding/tier info could go here
         }
       } catch (err) {
         console.error("Error fetching owner info:", err);
@@ -52,38 +63,28 @@ export const Showcase = () => {
     }
     fetchOwnerInfo();
     fetchShowcaseProperties();
-  }, [userId, selectedTags, maxPrice, selectedType, selectedStatus, searchCity]);
+  }, [userId, selectedTags, maxPrice, minSqFt, selectedType, selectedDevType, selectedStatus, searchCity, searchState, searchStreet]);
 
   async function fetchShowcaseProperties() {
     if (!userId) return;
     setLoading(true);
     try {
-      // First, get the owner's profile to potentially determine branding
-      const { data: profile } = await supabase
-        .from('public_profiles')
-        .select('*')
-        .eq('id', userId)
-        .maybeSingle();
-      
-      // We check if profile exists to satisfy the linter
-      if (profile) {
-        // Owner found
-      }
-      
-      // If we had a tier in public_profiles, we'd use it here. 
       setOwnerTier('free'); 
 
       let query = supabase
         .from('developments')
         .select('*')
         .eq('user_id', userId)
-        .or('parent_id.not.is.null,builder_id.is.null')
         .order('created_at', { ascending: false });
 
       if (selectedType) query = query.eq('unit_type', selectedType);
+      if (selectedDevType) query = query.eq('unit_type', selectedDevType);
       if (selectedStatus) query = query.eq('status', selectedStatus);
       if (maxPrice) query = query.lte('price_starting_at', parseFloat(maxPrice));
+      if (minSqFt) query = query.gte('sq_ft', parseFloat(minSqFt));
       if (searchCity.trim()) query = query.ilike('city', `%${searchCity.trim()}%`);
+      if (searchState.trim()) query = query.ilike('state', `%${searchState.trim()}%`);
+      if (searchStreet.trim()) query = query.ilike('street', `%${searchStreet.trim()}%`);
 
       selectedTags.forEach(tag => {
         query = query.eq(tag, true);
@@ -112,8 +113,7 @@ export const Showcase = () => {
 
       <section className="bg-surface-container-lowest p-6 rounded-3xl sunken-shadow mb-12 space-y-8 border border-outline-variant/10">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-6 items-end">
-          {/* Price Filter */}
-          <div className="lg:col-span-3 space-y-2">
+          <div className="lg:col-span-2 space-y-2">
             <label className="text-xs font-black uppercase tracking-widest text-on-surface-variant">Preço Máximo</label>
             <input 
               type="number" 
@@ -123,7 +123,26 @@ export const Showcase = () => {
               className="w-full bg-surface-container-high border-0 rounded-xl py-3 px-4 text-on-surface"
             />
           </div>
-          {/* City Filter */}
+          <div className="lg:col-span-2 space-y-2">
+            <label className="text-xs font-black uppercase tracking-widest text-on-surface-variant">Área Mín. (m²)</label>
+            <input 
+              type="number" 
+              value={minSqFt} 
+              onChange={(e) => setMinSqFt(e.target.value)}
+              placeholder="Ex: 100"
+              className="w-full bg-surface-container-high border-0 rounded-xl py-3 px-4 text-on-surface"
+            />
+          </div>
+          <div className="lg:col-span-1 space-y-2">
+            <label className="text-xs font-black uppercase tracking-widest text-on-surface-variant">UF</label>
+            <input 
+              type="text" 
+              value={searchState} 
+              onChange={(e) => setSearchState(e.target.value)}
+              placeholder="SC"
+              className="w-full bg-surface-container-high border-0 rounded-xl py-3 px-4 text-on-surface"
+            />
+          </div>
           <div className="lg:col-span-3 space-y-2">
             <label className="text-xs font-black uppercase tracking-widest text-on-surface-variant">Cidade</label>
             <input 
@@ -134,8 +153,7 @@ export const Showcase = () => {
               className="w-full bg-surface-container-high border-0 rounded-xl py-3 px-4 text-on-surface"
             />
           </div>
-          {/* Status Filter */}
-          <div className="lg:col-span-6 space-y-2">
+          <div className="lg:col-span-4 space-y-2">
             <label className="text-xs font-black uppercase tracking-widest text-on-surface-variant">Status</label>
             <div className="flex flex-wrap gap-2">
               {[
@@ -159,15 +177,50 @@ export const Showcase = () => {
           </div>
         </div>
 
+        <div className="space-y-2 pt-4 border-t border-outline-variant/10">
+          <label className="text-xs font-black uppercase tracking-widest text-on-surface-variant">Rua / Bairro</label>
+          <input 
+            type="text" 
+            value={searchStreet} 
+            onChange={(e) => setSearchStreet(e.target.value)}
+            placeholder="Ex: Rua das Flores"
+            className="w-full bg-surface-container-high border-0 rounded-xl py-3 px-4 text-on-surface"
+          />
+        </div>
+
         <div className="space-y-4 pt-4 border-t border-outline-variant/10">
           <div className="space-y-2">
-            <label className="text-xs font-black uppercase tracking-widest text-on-surface-variant">Tipo de Imóvel</label>
+            <label className="text-xs font-black uppercase tracking-widest text-on-surface-variant">Tipo de Unidade / Imóvel</label>
             <div className="flex flex-wrap gap-2">
               {propertyTypes.map(t => (
                 <button 
                   key={t.id} 
-                  onClick={() => setSelectedType(prev => prev === t.id ? "" : t.id)}
+                  onClick={() => {
+                    setSelectedType(prev => prev === t.id ? "" : t.id);
+                    setSelectedDevType("");
+                  }}
                   className={`flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold border-2 transition-all ${selectedType === t.id ? 'bg-primary border-primary text-on-primary shadow-lg shadow-primary/20' : 'bg-surface-container-high border-transparent text-on-surface-variant'}`}
+                >
+                  <span className="material-symbols-outlined text-sm">{t.icon}</span>
+                  {t.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div className="space-y-4 pt-4 border-t border-outline-variant/10">
+          <div className="space-y-2">
+            <label className="text-xs font-black uppercase tracking-widest text-on-surface-variant">Tipo de Empreendimento / Área</label>
+            <div className="flex flex-wrap gap-2">
+              {developmentTypes.map(t => (
+                <button 
+                  key={t.id} 
+                  onClick={() => {
+                    setSelectedDevType(prev => prev === t.id ? "" : t.id);
+                    setSelectedType("");
+                  }}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold border-2 transition-all ${selectedDevType === t.id ? 'bg-tertiary border-tertiary text-on-tertiary shadow-lg shadow-tertiary/20' : 'bg-surface-container-high border-transparent text-on-surface-variant'}`}
                 >
                   <span className="material-symbols-outlined text-sm">{t.icon}</span>
                   {t.label}
@@ -195,10 +248,20 @@ export const Showcase = () => {
           </div>
         </div>
 
-        {(maxPrice || selectedTags.length > 0 || selectedType || selectedStatus || searchCity) && (
+        {(maxPrice || minSqFt || selectedTags.length > 0 || selectedType || selectedDevType || selectedStatus || searchCity || searchState || searchStreet) && (
           <div className="flex justify-end pt-2">
             <button 
-              onClick={() => { setMaxPrice(""); setSelectedTags([]); setSelectedType(""); setSelectedStatus(""); setSearchCity(""); }}
+              onClick={() => { 
+                setMaxPrice(""); 
+                setMinSqFt("");
+                setSelectedTags([]); 
+                setSelectedType(""); 
+                setSelectedDevType("");
+                setSelectedStatus(""); 
+                setSearchCity(""); 
+                setSearchState("");
+                setSearchStreet("");
+              }}
               className="text-primary text-xs font-black uppercase tracking-widest hover:underline flex items-center gap-1"
             >
               <span className="material-symbols-outlined text-sm">filter_alt_off</span>
@@ -216,8 +279,19 @@ export const Showcase = () => {
             <Link key={prop.id} to={`/view/${prop.id}`}>
               <article className="group bg-surface-container-low rounded-3xl overflow-hidden hover:bg-surface-bright transition-all duration-500 sunken-shadow h-full border border-transparent hover:border-primary/20">
                 <div className="h-56 overflow-hidden relative">
-                  <img src={prop.hero_image_url || "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?q=80&w=2070&auto=format&fit=crop"} alt={prop.title} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" />
-                  <div className="absolute top-4 left-4 bg-primary text-on-primary text-[10px] font-black uppercase tracking-[0.2em] px-3 py-1 rounded-full">{prop.unit_type || 'Imóvel'}</div>
+                  {prop.hero_image_url?.match(/\.pdf$/i) ? (
+                    <div className="w-full h-full flex flex-col items-center justify-center text-primary bg-primary/5">
+                      <span className="material-symbols-outlined text-5xl">picture_as_pdf</span>
+                      <span className="text-[10px] font-black mt-2 uppercase tracking-widest">Documento PDF</span>
+                    </div>
+                  ) : (
+                    <img src={prop.hero_image_url || "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?q=80&w=2070&auto=format&fit=crop"} alt={prop.title} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" />
+                  )}
+                  <div className="absolute top-4 left-4 bg-primary text-on-primary text-[10px] font-black uppercase tracking-[0.2em] px-3 py-1 rounded-full">
+                    {['dormitory', 'studio', 'commercial', 'house', 'land', 'mixed', 'commercial_center', 'residential_center'].includes(prop.unit_type) 
+                      ? t(`consultancy.types.${prop.unit_type}`) 
+                      : 'Imóvel'}
+                  </div>
                   {prop.status !== 'available' && (
                     <div className={`absolute top-4 right-4 text-[10px] font-black uppercase tracking-[0.2em] px-3 py-1 rounded-full ${prop.status === 'sold' ? 'bg-red-500 text-white' : 'bg-amber-500 text-white'}`}>
                       {prop.status === 'sold' ? 'Vendido' : 'Reservado'}

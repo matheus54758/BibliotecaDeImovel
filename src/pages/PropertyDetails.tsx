@@ -178,8 +178,8 @@ export const PropertyDetails = () => {
         // Normalize unit_type to our standard keys
         const normalizeType = (type: string, desc: string) => {
           const combined = (String(type || '') + ' ' + String(desc || '')).toLowerCase();
+          if (combined.includes('sala') || combined.includes('comercial') || combined.includes('loja') || combined.includes('escritorio') || combined.includes('office')) return 'commercial';
           if (combined.includes('studio') || combined.includes('kitnet')) return 'studio';
-          if (combined.includes('comercial') || combined.includes('sala') || combined.includes('loja')) return 'commercial';
           if (combined.includes('casa') || combined.includes('sobrado')) return 'house';
           return 'dormitory';
         };
@@ -454,8 +454,18 @@ export const PropertyDetails = () => {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 px-4">
         <div className="lg:col-span-8 space-y-12">
           <div className="space-y-4">
-            <div className="relative h-[614px] min-h-[500px] w-full bg-surface-container-low rounded-xl overflow-hidden group cursor-zoom-in" onClick={() => setSelectedMedia({ url: property.hero_image_url || "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?q=80&w=2070&auto=format&fit=crop", type: 'image' })}>
-              <img src={property.hero_image_url || "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?q=80&w=2070&auto=format&fit=crop"} alt={property.title} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
+            <div className="relative h-[614px] min-h-[500px] w-full bg-surface-container-low rounded-xl overflow-hidden group cursor-zoom-in" onClick={() => setSelectedMedia({ url: property.hero_image_url || "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?q=80&w=2070&auto=format&fit=crop", type: property.hero_image_url?.match(/\.pdf$/i) ? 'image' : 'image' })}>
+              {property.hero_image_url?.match(/\.pdf$/i) ? (
+                <div className="w-full h-full flex flex-col items-center justify-center text-primary bg-primary/5">
+                  <span className="material-symbols-outlined text-[120px]">picture_as_pdf</span>
+                  <span className="text-2xl font-black mt-4 uppercase tracking-[0.2em]">Documento PDF</span>
+                  <a href={property.hero_image_url} target="_blank" rel="noopener noreferrer" className="mt-8 px-8 py-3 bg-primary text-on-primary rounded-full font-bold uppercase tracking-widest hover:opacity-90 transition-opacity" onClick={(e) => e.stopPropagation()}>
+                    Abrir Documento
+                  </a>
+                </div>
+              ) : (
+                <img src={property.hero_image_url || "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?q=80&w=2070&auto=format&fit=crop"} alt={property.title} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
+              )}
               <div className="absolute top-6 left-6 flex gap-3">
                 <span className={`px-4 py-1.5 rounded-full text-xs font-semibold uppercase tracking-wider font-label flex items-center gap-1 border ${getStatusColor(property.status, property.title)}`}>
                   <span className={`w-2 h-2 rounded-full ${getStatusDotColor(property.status, property.title)}`}></span> 
@@ -479,15 +489,19 @@ export const PropertyDetails = () => {
                     <span className="text-xs uppercase text-on-surface-variant/60 font-bold tracking-widest mb-1">Área Total</span>
                     <span className="text-2xl font-headline font-bold text-primary">{formatNumber(property.sq_ft)}m²</span>
                   </div>
-                  <div className="flex flex-col">
-                    <span className="text-xs uppercase text-on-surface-variant/60 font-bold tracking-widest mb-1">Dormitórios</span>
-                    <span className="text-2xl font-headline font-bold text-primary">{property.bedrooms || 0}</span>
-                  </div>
-                  <div className="flex flex-col">
-                    <span className="text-xs uppercase text-on-surface-variant/60 font-bold tracking-widest mb-1">Banheiros</span>
-                    <span className="text-2xl font-headline font-bold text-primary">{property.bathrooms || 0}</span>
-                  </div>
-                  {!isSubUnit && property.parking_spaces > 0 && (
+                  {property.unit_type !== 'land' && (
+                    <>
+                      <div className="flex flex-col">
+                        <span className="text-xs uppercase text-on-surface-variant/60 font-bold tracking-widest mb-1">Dormitórios</span>
+                        <span className="text-2xl font-headline font-bold text-primary">{property.bedrooms || 0}</span>
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-xs uppercase text-on-surface-variant/60 font-bold tracking-widest mb-1">Banheiros</span>
+                        <span className="text-2xl font-headline font-bold text-primary">{property.bathrooms || 0}</span>
+                      </div>
+                    </>
+                  )}
+                  {!isSubUnit && property.parking_spaces > 0 && property.unit_type !== 'land' && (
                     <div className="flex flex-col">
                       <span className="text-xs uppercase text-on-surface-variant/60 font-bold tracking-widest mb-1">Vagas</span>
                       <span className="text-2xl font-headline font-bold text-primary">{property.parking_spaces}</span>
@@ -608,9 +622,16 @@ export const PropertyDetails = () => {
                         <div 
                           key={index}
                           className="relative aspect-[4/3] bg-surface-container-low rounded-lg overflow-hidden border border-outline-variant/20 cursor-zoom-in group"
-                          onClick={() => setSelectedMedia({ url, type: 'image' })}
+                          onClick={() => setSelectedMedia({ url, type: url.match(/\.pdf$/i) ? 'image' : 'image' })}
                         >
-                          <img src={url} className="w-full h-full object-contain p-4 group-hover:scale-105 transition-transform duration-500" alt={isStandaloneProperty ? `Foto ${index + 1}` : `Planta ${index + 1}`} />
+                          {url.match(/\.pdf$/i) ? (
+                            <div className="w-full h-full flex flex-col items-center justify-center text-primary bg-primary/5 p-4">
+                              <span className="material-symbols-outlined text-4xl">picture_as_pdf</span>
+                              <span className="text-[10px] font-bold mt-2 uppercase text-center">Documento PDF</span>
+                            </div>
+                          ) : (
+                            <img src={url} className="w-full h-full object-contain p-4 group-hover:scale-105 transition-transform duration-500" alt={isStandaloneProperty ? `Foto ${index + 1}` : `Planta ${index + 1}`} />
+                          )}
                           <div className="absolute bottom-4 left-4 px-3 py-1 bg-black/60 backdrop-blur-md text-white text-[10px] font-bold rounded-full uppercase tracking-tighter">
                             {isStandaloneProperty ? `Imagem #${index + 1}` : `Planta #${index + 1}`}
                           </div>
@@ -717,7 +738,6 @@ export const PropertyDetails = () => {
                       {selling ? 'Registrando...' : (property.parent_id ? "Unidade Vendida" : "Imóvel Vendido")}
                     </Button>
                   )}
-                  <Button className="w-full py-4 text-lg font-bold flex items-center justify-center gap-2">{t('common.request_info')}<span className="material-symbols-outlined">arrow_forward</span></Button>
                   <button onClick={() => generatePropertyPDF(property, amenities, gallery, subUnits)} className="w-full py-3 border-2 border-primary text-primary hover:bg-primary hover:text-on-primary transition-all rounded-md font-bold flex items-center justify-center gap-2"><span className="material-symbols-outlined">download</span>{t('common.download_pdf')}</button>
                 </div>
               </div>
@@ -775,7 +795,9 @@ export const PropertyDetails = () => {
                           {unit.title?.includes('(INDISPONÍVEL)') ? t('status.unavailable') : t(`status.${unit.status}`)}
                         </span>
                       </div>
-                      <p className="text-xs font-bold text-primary uppercase tracking-tighter mb-4">{unit.unit_type || 'Unidade'}</p>
+                      <p className="text-xs font-bold text-primary uppercase tracking-tighter mb-4">
+                        {['land', 'mixed', 'commercial_center', 'residential_center', 'dormitory', 'studio', 'commercial', 'house'].includes(unit.unit_type) ? t(`consultancy.types.${unit.unit_type}`) : 'Unidade'}
+                      </p>
                       
                       <div className="space-y-4 mb-6">
                         <div className="grid grid-cols-2 gap-y-3">
@@ -783,10 +805,12 @@ export const PropertyDetails = () => {
                             <span className="material-symbols-outlined text-sm">square_foot</span>
                             <span className="text-sm font-medium">{formatNumber(unit.sq_ft)}m²</span>
                           </div>
-                          <div className="flex items-center gap-2 text-on-surface-variant">
-                            <span className="material-symbols-outlined text-sm">meeting_room</span>
-                            <span className="text-sm font-medium">{unit.bedrooms || 0} Dorm.</span>
-                          </div>
+                          {unit.unit_type !== 'land' && (
+                            <div className="flex items-center gap-2 text-on-surface-variant">
+                              <span className="material-symbols-outlined text-sm">meeting_room</span>
+                              <span className="text-sm font-medium">{unit.bedrooms || 0} Dorm.</span>
+                            </div>
+                          )}
                         </div>
 
                         <div className="space-y-2 pt-2 border-t border-outline-variant/5">

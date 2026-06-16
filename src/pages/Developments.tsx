@@ -111,17 +111,30 @@ export const Developments = () => {
                 className="group rounded-xl overflow-hidden bg-surface-container-low hover:bg-surface-bright transition-all duration-300 relative sunken-shadow h-full"
               >
                 <div className="h-64 overflow-hidden relative">
-                  <img
-                    src={dev.hero_image_url || "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?q=80&w=2070&auto=format&fit=crop"}
-                    alt={dev.title}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
-                  />
+                  {dev.hero_image_url?.match(/\.pdf$/i) ? (
+                    <div className="w-full h-full flex flex-col items-center justify-center text-primary bg-primary/5">
+                      <span className="material-symbols-outlined text-5xl">picture_as_pdf</span>
+                      <span className="text-[10px] font-black mt-2 uppercase tracking-widest">Documento PDF</span>
+                    </div>
+                  ) : (
+                    <img
+                      src={dev.hero_image_url || "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?q=80&w=2070&auto=format&fit=crop"}
+                      alt={dev.title}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
+                    />
+                  )}
                   <div className={`absolute top-4 left-4 text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider ${
                     dev.title?.includes('(INDISPONÍVEL)') 
                       ? 'bg-error/10 text-error border border-error/20' 
                       : 'bg-tertiary-container text-on-tertiary'
                   }`}>
-                    {dev.title?.includes('(INDISPONÍVEL)') ? t('status.unavailable') : t(`status.${dev.status}`)}
+                    {dev.title?.includes('(INDISPONÍVEL)') 
+                      ? t('status.unavailable') 
+                      : (['land', 'mixed', 'commercial_center', 'residential_center'].includes(dev.unit_type)
+                          ? t(`consultancy.types.${dev.unit_type}`) 
+                          : (isProjectsView ? "Empreendimento" : "Imóvel")
+                        )
+                    }
                   </div>
                 </div>
                 <div className="p-6 relative">

@@ -7,6 +7,8 @@ import { Login } from './pages/Login';
 import { RegisterBuilder } from './pages/RegisterBuilder';
 import { PropertyDetails } from './pages/PropertyDetails';
 import { NewDevelopment } from './pages/NewDevelopment';
+import { Lands } from './pages/Lands';
+import { RegisterLand } from './pages/RegisterLand';
 import { Consultancy } from './pages/Consultancy';
 import { ProtectedRoute } from './components/ProtectedRoute';
 
@@ -29,6 +31,9 @@ function App() {
             <Route path="/" element={<Dashboard />} />
             <Route path="/project-developments" element={<Developments />} />
             <Route path="/developments" element={<Developments />} />
+            <Route path="/lands" element={<Lands />} />
+            <Route path="/lands/new" element={<RegisterLand />} />
+            <Route path="/lands/edit/:id" element={<RegisterLand />} />
             <Route path="/developments/new" element={<NewDevelopment />} />
             <Route path="/developments/:id" element={<PropertyDetails />} />
             <Route path="/developments/edit/:id" element={<NewDevelopment />} />

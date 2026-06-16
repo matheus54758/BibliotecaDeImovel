@@ -11,6 +11,7 @@ export const Consultancy = () => {
   
   // Filters
   const [maxPrice, setMaxPrice] = useState<string>("");
+  const [minSqFt, setMinSqFt] = useState<string>("");
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [selectedType, setSelectedType] = useState<string>("");
   const [selectedStatus, setSelectedStatus] = useState<string>("");
@@ -21,10 +22,10 @@ export const Consultancy = () => {
   const [showSuggestions, setShowSuggestions] = useState(false);
 
   const propertyTypes = [
-    { id: 'dormitory', label: t('consultancy.types.dormitory'), icon: 'apartment' },
-    { id: 'studio', label: t('consultancy.types.studio'), icon: 'grid_view' },
-    { id: 'commercial', label: t('consultancy.types.commercial'), icon: 'storefront' },
-    { id: 'house', label: t('consultancy.types.house'), icon: 'home' },
+    { id: 'land', label: t('consultancy.types.land'), icon: 'landscape' },
+    { id: 'mixed', label: t('consultancy.types.mixed'), icon: 'domain_add' },
+    { id: 'commercial_center', label: t('consultancy.types.commercial_center'), icon: 'business_center' },
+    { id: 'residential_center', label: t('consultancy.types.residential_center'), icon: 'apartment' },
   ];
 
   const tags = [
@@ -84,13 +85,11 @@ export const Consultancy = () => {
         return;
       }
 
-      // Query units (parent_id != null) and standalone properties (parent_id == null AND builder_id == null)
-      // Exclude developments (parent_id == null AND builder_id != null)
+      // Query all properties, units and developments
       let query = supabase
         .from('developments')
         .select('*')
         .eq('user_id', user.id)
-        .or('parent_id.not.is.null,builder_id.is.null')
         .order('created_at', { ascending: false });
 
       // Apply type filter
@@ -111,6 +110,11 @@ export const Consultancy = () => {
       // Apply price filter
       if (maxPrice && !isNaN(parseFloat(maxPrice))) {
         query = query.lte('price_starting_at', parseFloat(maxPrice));
+      }
+
+      // Apply sq_ft filter
+      if (minSqFt && !isNaN(parseFloat(minSqFt))) {
+        query = query.gte('sq_ft', parseFloat(minSqFt));
       }
 
       // Apply Location Filters
@@ -160,6 +164,34 @@ export const Consultancy = () => {
       {/* Filters Section */}
       <section className="bg-surface-container-lowest p-6 rounded-2xl sunken-shadow mb-12 space-y-8 mx-4 md:mx-0">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-end">
+          {/* Price Filter */}
+          <div className="lg:col-span-2 space-y-2">
+            <label className="block text-sm font-label font-bold text-on-surface uppercase tracking-wider">
+              Preço Máximo
+            </label>
+            <input
+              type="number"
+              value={maxPrice}
+              onChange={(e) => setMaxPrice(e.target.value)}
+              placeholder="Ex: 500.000"
+              className="w-full bg-surface-container-high border-0 rounded-xl py-3 px-4 text-on-surface focus:ring-2 focus:ring-primary/20 transition-all font-body"
+            />
+          </div>
+
+          {/* Area Filter */}
+          <div className="lg:col-span-2 space-y-2">
+            <label className="block text-sm font-label font-bold text-on-surface uppercase tracking-wider">
+              Área Mínima (m²)
+            </label>
+            <input
+              type="number"
+              value={minSqFt}
+              onChange={(e) => setMinSqFt(e.target.value)}
+              placeholder="Ex: 50"
+              className="w-full bg-surface-container-high border-0 rounded-xl py-3 px-4 text-on-surface focus:ring-2 focus:ring-primary/20 transition-all font-body"
+            />
+          </div>
+
           {/* Status Filter */}
           <div className="lg:col-span-4 space-y-2">
             <label className="block text-sm font-label font-bold text-on-surface uppercase tracking-wider">
@@ -327,7 +359,9 @@ export const Consultancy = () => {
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
                     />
                     <div className="absolute top-4 left-4 backdrop-blur px-3 py-1 rounded-full text-[10px] font-bold bg-primary/90 text-on-primary uppercase tracking-widest">
-                      {prop.unit_type ? t(`consultancy.types.${prop.unit_type}`) : t('nav.developments')}
+                      {['land', 'mixed', 'commercial_center', 'residential_center', 'dormitory', 'studio', 'commercial', 'house'].includes(prop.unit_type) 
+                        ? t(`consultancy.types.${prop.unit_type}`) 
+                        : t('nav.developments')}
                     </div>
                     <div className={`absolute top-4 right-4 backdrop-blur px-3 py-1 rounded-full text-xs font-bold ${
                       prop.title?.includes('(INDISPONÍVEL)') 

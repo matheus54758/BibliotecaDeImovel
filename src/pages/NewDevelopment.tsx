@@ -17,6 +17,7 @@ export const NewDevelopment = () => {
   const isEditing = Boolean(id);
   const [isStandaloneProperty, setIsStandaloneProperty] = useState(searchParams.get("type") === "property");
   const parentIdFromUrl = searchParams.get("parentId");
+  const unitTypeFromUrl = searchParams.get("unitType");
   
   const [builders, setBuilders] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -68,6 +69,7 @@ export const NewDevelopment = () => {
   });
 
   const heroImageUrl = watch("hero_image_url");
+  const selectedUnitType = watch("type");
 
   useEffect(() => {
     async function fetchData() {
@@ -125,6 +127,10 @@ export const NewDevelopment = () => {
           .eq('user_id', user.id);
         
         setBuilders(buildersData || []);
+
+        if (unitTypeFromUrl) {
+          setValue("type", unitTypeFromUrl);
+        }
 
         if (isEditing) {
           const { data: propData, error: propError } = await supabase
@@ -398,10 +404,14 @@ export const NewDevelopment = () => {
                     className="w-full bg-surface-container-high border-0 rounded py-3 px-4 text-on-surface focus:ring-2 focus:ring-surface-tint/20 transition-colors appearance-none"
                   >
                     <option value="">Selecione o tipo...</option>
+                    <option value="residential_center">{t('consultancy.types.residential_center')}</option>
+                    <option value="commercial_center">{t('consultancy.types.commercial_center')}</option>
+                    <option value="mixed">{t('consultancy.types.mixed')}</option>
+                    <option value="land">{t('consultancy.types.land')}</option>
                     <option value="dormitory">Apartamento</option>
-                    <option value="studio">Studio / Kitnet</option>
                     <option value="commercial">Comercial</option>
-                    <option value="house">Casa / Sobrado</option>
+                    <option value="studio">Studio</option>
+                    <option value="house">Casa</option>
                   </select>
                 </div>
               </div>

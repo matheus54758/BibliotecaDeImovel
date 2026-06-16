@@ -68,11 +68,23 @@ export const PropertyPublic = () => {
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
         <div className="lg:col-span-8 space-y-12">
-          <div className="relative h-[600px] w-full bg-surface-container-low rounded-3xl overflow-hidden shadow-2xl group cursor-zoom-in" onClick={() => setSelectedMedia({ url: property.hero_image_url || "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?q=80&w=2070&auto=format&fit=crop", type: 'image' })}>
-            <img src={property.hero_image_url || "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?q=80&w=2070&auto=format&fit=crop"} alt={property.title} className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105" />
+          <div className="relative h-[600px] w-full bg-surface-container-low rounded-3xl overflow-hidden shadow-2xl group cursor-zoom-in" onClick={() => setSelectedMedia({ url: property.hero_image_url || "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?q=80&w=2070&auto=format&fit=crop", type: property.hero_image_url?.match(/\.pdf$/i) ? 'image' : 'image' })}>
+            {property.hero_image_url?.match(/\.pdf$/i) ? (
+              <div className="w-full h-full flex flex-col items-center justify-center text-primary bg-primary/5">
+                <span className="material-symbols-outlined text-[120px]">picture_as_pdf</span>
+                <span className="text-2xl font-black mt-4 uppercase tracking-[0.2em]">Documento PDF</span>
+                <a href={property.hero_image_url} target="_blank" rel="noopener noreferrer" className="mt-8 px-8 py-3 bg-primary text-on-primary rounded-full font-bold uppercase tracking-widest hover:opacity-90 transition-opacity" onClick={(e) => e.stopPropagation()}>
+                  Abrir Documento
+                </a>
+              </div>
+            ) : (
+              <img src={property.hero_image_url || "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?q=80&w=2070&auto=format&fit=crop"} alt={property.title} className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105" />
+            )}
             <div className="absolute top-6 left-6 flex gap-3">
               <span className="px-4 py-2 bg-white/90 backdrop-blur text-primary text-xs font-black uppercase tracking-[0.2em] rounded-full shadow-lg">
-                {property.unit_type || 'Imóvel'}
+                {['land', 'mixed', 'commercial_center', 'residential_center'].includes(property.unit_type) 
+                  ? t(`consultancy.types.${property.unit_type}`) 
+                  : 'Imóvel'}
               </span>
             </div>
           </div>
@@ -87,15 +99,19 @@ export const PropertyPublic = () => {
                   <span className="text-[10px] font-black text-on-surface-variant/60 uppercase tracking-widest mb-1">Área</span>
                   <span className="text-xl font-headline font-bold text-primary">{formatNumber(property.sq_ft)}m²</span>
                 </div>
-                <div className="flex flex-col">
-                  <span className="text-[10px] font-black text-on-surface-variant/60 uppercase tracking-widest mb-1">Dormitórios</span>
-                  <span className="text-xl font-headline font-bold text-primary">{property.bedrooms || 0}</span>
-                </div>
-                <div className="flex flex-col">
-                  <span className="text-[10px] font-black text-on-surface-variant/60 uppercase tracking-widest mb-1">Banheiros</span>
-                  <span className="text-xl font-headline font-bold text-primary">{Math.max(1, property.bathrooms || 0)}</span>
-                </div>
-                {property.parent_id === null && property.parking_spaces > 0 && (
+                {property.unit_type !== 'land' && (
+                  <>
+                    <div className="flex flex-col">
+                      <span className="text-[10px] font-black text-on-surface-variant/60 uppercase tracking-widest mb-1">Dormitórios</span>
+                      <span className="text-xl font-headline font-bold text-primary">{property.bedrooms || 0}</span>
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-[10px] font-black text-on-surface-variant/60 uppercase tracking-widest mb-1">Banheiros</span>
+                      <span className="text-xl font-headline font-bold text-primary">{Math.max(1, property.bathrooms || 0)}</span>
+                    </div>
+                  </>
+                )}
+                {property.parent_id === null && property.parking_spaces > 0 && property.unit_type !== 'land' && (
                   <div className="flex flex-col">
                     <span className="text-[10px] font-black text-on-surface-variant/60 uppercase tracking-widest mb-1">Vagas</span>
                     <span className="text-xl font-headline font-bold text-primary">{property.parking_spaces}</span>
@@ -111,7 +127,14 @@ export const PropertyPublic = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {gallery.map((media, idx) => (
                   <div key={idx} className="relative aspect-[4/3] bg-surface-container-low rounded-2xl overflow-hidden border border-outline-variant/10 cursor-zoom-in group" onClick={() => setSelectedMedia({ url: media.url, type: media.type })}>
-                    <img src={media.url} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" alt={`Galeria ${idx}`} />
+                    {media.url.match(/\.pdf$/i) ? (
+                      <div className="w-full h-full flex flex-col items-center justify-center text-primary bg-primary/5 p-8">
+                        <span className="material-symbols-outlined text-6xl">picture_as_pdf</span>
+                        <span className="text-xs font-bold mt-4 uppercase text-center">Documento PDF</span>
+                      </div>
+                    ) : (
+                      <img src={media.url} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" alt={`Galeria ${idx}`} />
+                    )}
                   </div>
                 ))}
               </div>

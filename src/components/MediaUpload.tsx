@@ -68,10 +68,10 @@ export const MediaUpload = ({ onUpload, label, className, previewUrl, accept = '
 
   const previews = Array.isArray(previewUrl) ? previewUrl : (previewUrl ? [previewUrl] : []);
   const acceptedTypes = 
-    accept === 'image' ? 'image/*' : 
+    accept === 'image' ? 'image/*,application/pdf' : 
     accept === 'video' ? 'video/*' : 
     accept === 'pdf' ? 'application/pdf' : 
-    accept === 'both' ? 'image/*,video/*' : 
+    accept === 'both' ? 'image/*,video/*,application/pdf' : 
     '*/*';
 
   return (

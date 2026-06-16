@@ -10,6 +10,7 @@ export const SideNavBar = () => {
     { name: t('nav.overview'), icon: 'dashboard', path: '/' },
     { name: t('nav.project_developments'), icon: 'corporate_fare', path: '/project-developments' },
     { name: t('nav.developments'), icon: 'apartment', path: '/developments' },
+    { name: t('nav.lands'), icon: 'landscape', path: '/lands' },
     { name: t('nav.construction'), icon: 'engineering', path: '/builders' },
     { name: t('nav.consultancy'), icon: 'business_center', path: '/consultancy' },
   ];
@@ -25,6 +26,11 @@ export const SideNavBar = () => {
     if (path === '/project-developments') {
       const isProjectCreation = currentPath === '/developments/new' && type === 'project';
       return currentPath.startsWith('/project-developments') || currentPath.startsWith('/projects') || isProjectCreation;
+    }
+    
+    // Terrenos (Aba /lands)
+    if (path === '/lands') {
+      return currentPath.startsWith('/lands');
     }
     
     // Imóveis (Aba /developments)

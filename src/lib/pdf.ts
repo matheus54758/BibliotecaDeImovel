@@ -23,6 +23,10 @@ export const generatePropertyPDF = async (property: any, amenities: any[], galle
 
     const addImageToPDF = (url: string, x: number, y: number, w: number, h: number): Promise<void> => {
       return new Promise((resolve) => {
+        if (!url || url.match(/\.pdf$/i)) {
+          console.log("Ignorando arquivo PDF na geração de imagens do relatório:", url);
+          return resolve();
+        }
         const img = new Image();
         img.crossOrigin = "Anonymous";
         const timeout = setTimeout(() => resolve(), 10000);
@@ -93,8 +97,24 @@ export const generatePropertyPDF = async (property: any, amenities: any[], galle
     // Stats
     let currentYAfterHeader = 185;
     if (!isProject) {
-      const statsHeader = ['Área', 'Dormitórios', 'Banheiros'];
-      const statsRow = [`${property.sq_ft}m²`, `${property.bedrooms || '0'}`, `${property.bathrooms || '0'}`];
+      // For sub-units (property.parent_id !== null) or lands, we skip irrelevant stats
+      const isSubUnit = property.parent_id !== null;
+      const isLand = property.unit_type === 'land';
+      
+      let statsHeader: string[] = [];
+      let statsRow: string[] = [];
+
+      if (isLand) {
+        statsHeader = ['Área Total'];
+        statsRow = [`${formatNumber(property.sq_ft)}m²` || '0m²'];
+      } else if (isSubUnit) {
+        statsHeader = ['Área', 'Dormitórios'];
+        statsRow = [`${property.sq_ft}m²`, `${property.bedrooms || '0'}`];
+      } else {
+        statsHeader = ['Área', 'Dormitórios', 'Banheiros'];
+        statsRow = [`${property.sq_ft}m²`, `${property.bedrooms || '0'}`, `${property.bathrooms || '0'}`];
+      }
+        
       autoTable(doc, {
         startY: 190,
         margin: { left: 15, right: 15 },
@@ -103,6 +123,32 @@ export const generatePropertyPDF = async (property: any, amenities: any[], galle
         styles: { fontSize: 11, cellPadding: 3, textColor: [0, 0, 0] },
       });
       currentYAfterHeader = (doc as any).lastAutoTable.finalY;
+
+      // Payment Plan Section for sub-units/standalone properties
+      if (property.price_starting_at > 0) {
+        doc.setTextColor(black[0], black[1], black[2]);
+        doc.setFontSize(14);
+        doc.setFont('helvetica', 'bold');
+        doc.text("Plano de Pagamento", 15, currentYAfterHeader + 10);
+        
+        const paymentData = [];
+        if (property.payment_entry > 0) paymentData.push(['Entrada', formatCurrency(property.payment_entry)]);
+        if (property.payment_installment_count > 0) paymentData.push([`${property.payment_installment_count}x Mensais`, formatCurrency(property.payment_installment_value)]);
+        if (property.payment_reinforcement_count > 0) paymentData.push([`${property.payment_reinforcement_count}x Reforços`, formatCurrency(property.payment_reinforcement_value)]);
+        if (property.payment_post_construction > 0) paymentData.push(['Saldo Pós-Obra', formatCurrency(property.payment_post_construction)]);
+        
+        if (paymentData.length > 0) {
+          autoTable(doc, {
+            startY: currentYAfterHeader + 15,
+            margin: { left: 15, right: 15 },
+            body: paymentData,
+            theme: 'striped',
+            styles: { fontSize: 10, cellPadding: 2 },
+            columnStyles: { 0: { fontStyle: 'bold', cellWidth: 50 } }
+          });
+          currentYAfterHeader = (doc as any).lastAutoTable.finalY;
+        }
+      }
     }
 
     // Description (Multi-page)
