@@ -151,7 +151,7 @@ export const RegisterBuilder = () => {
               <MediaUpload 
                 label={t('builders.form.logo')}
                 onUpload={(url) => setValue("logo_url", Array.isArray(url) ? url[0] : url, { shouldValidate: true })}
-                previewUrl={logoUrl}
+                previewUrl={logoUrl || undefined}
                 accept="image"
               />
               {errors.logo_url && <p className="text-xs text-error font-medium">{errors.logo_url.message}</p>}

@@ -158,10 +158,6 @@ export const Consultancy = () => {
     );
   };
 
-  const toggleType = (typeId: string) => {
-    setSelectedType(prev => prev === typeId ? "" : typeId);
-  };
-
   return (
     <div className="max-w-7xl mx-auto py-8">
       <header className="mb-12 px-4 md:px-0">
