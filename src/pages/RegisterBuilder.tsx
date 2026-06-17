@@ -47,7 +47,19 @@ export const RegisterBuilder = () => {
             .single();
           
           if (error) throw error;
-          reset(data);
+          
+          // Filter data to only include fields expected by the form/schema
+          const sanitizedData = {
+            name: data.name || "",
+            cnpj: data.cnpj || "",
+            specialization: data.specialization || "",
+            email: data.email || "",
+            phone: data.phone || "",
+            address: data.address || "",
+            city: data.city || "",
+            logo_url: data.logo_url || "",
+          };
+          reset(sanitizedData);
         } catch (error) {
           console.error("Error fetching builder:", error);
           alert(t('common.load_error'));
@@ -84,6 +96,7 @@ export const RegisterBuilder = () => {
           .eq('id', id);
         
         if (error) throw error;
+        alert("Perfil atualizado com sucesso!");
       } else {
         const { error } = await supabase.from('builders').insert([{ ...builderData, status: 'active' }]);
         if (error) throw error;
@@ -96,6 +109,11 @@ export const RegisterBuilder = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const onInvalid = (errors: any) => {
+    console.error("Form validation failed:", errors);
+    alert("Erro de validação: Verifique os campos preenchidos.");
   };
 
   if (fetching) return <div className="p-8 text-on-surface/50 font-body">{t('common.loading')}</div>;
@@ -123,7 +141,7 @@ export const RegisterBuilder = () => {
             </p>
           </div>
 
-          <form className="space-y-8" onSubmit={handleSubmit(onSubmit)}>
+          <form className="space-y-8" onSubmit={handleSubmit(onSubmit, onInvalid)}>
             <div className="bg-surface-container-lowest rounded-lg p-6 sunken-shadow relative z-10 space-y-8">
               <h3 className="font-headline text-lg font-bold text-primary flex items-center border-b border-surface-container pb-4">
                 <span className="material-symbols-outlined mr-2">business</span>
@@ -136,6 +154,7 @@ export const RegisterBuilder = () => {
                 previewUrl={logoUrl}
                 accept="image"
               />
+              {errors.logo_url && <p className="text-xs text-error font-medium">{errors.logo_url.message}</p>}
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <InputField label={t('builders.company_name')} {...register("name")} error={errors.name?.message} className="md:col-span-2" placeholder="e.g. Apex Construction Ltd." />

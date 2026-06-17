@@ -182,7 +182,8 @@ const resources = {
           "dormitory": "Apartment",
           "studio": "Studio",
           "commercial": "Commercial",
-          "house": "House"
+          "house": "House",
+          "farm": "Chácara"
         },
         "tags": {
           "is_penthouse": "Penthouse",
@@ -392,7 +393,8 @@ const resources = {
           "dormitory": "Apartamento",
           "studio": "Studio / Kitnet",
           "commercial": "Comercial",
-          "house": "Casa / Sobrado"
+          "house": "Casa / Sobrado",
+          "farm": "Chácara"
         },
         "tags": {
           "is_penthouse": "Cobertura",
@@ -588,7 +590,8 @@ const resources = {
           "dormitory": "Apartamento",
           "studio": "Studio",
           "commercial": "Comercial",
-          "house": "Casa"
+          "house": "Casa",
+          "farm": "Quinta / Chácara"
         },
         "tags": {
           "is_penthouse": "Ático",

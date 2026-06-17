@@ -14,6 +14,7 @@ export const Consultancy = () => {
   const [minSqFt, setMinSqFt] = useState<string>("");
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [selectedType, setSelectedType] = useState<string>("");
+  const [selectedDevType, setSelectedDevType] = useState<string>("");
   const [selectedStatus, setSelectedStatus] = useState<string>("");
   const [searchState, setSearchState] = useState<string>("");
   const [searchCity, setSearchCity] = useState<string>("");
@@ -22,10 +23,18 @@ export const Consultancy = () => {
   const [showSuggestions, setShowSuggestions] = useState(false);
 
   const propertyTypes = [
+    { id: 'dormitory', label: 'Apartamento', icon: 'apartment' },
+    { id: 'studio', label: 'Studio', icon: 'grid_view' },
+    { id: 'commercial', label: 'Comercial', icon: 'storefront' },
+    { id: 'house', label: 'Casa', icon: 'home' },
+  ];
+
+  const developmentTypes = [
     { id: 'land', label: t('consultancy.types.land'), icon: 'landscape' },
     { id: 'mixed', label: t('consultancy.types.mixed'), icon: 'domain_add' },
     { id: 'commercial_center', label: t('consultancy.types.commercial_center'), icon: 'business_center' },
     { id: 'residential_center', label: t('consultancy.types.residential_center'), icon: 'apartment' },
+    { id: 'farm', label: t('consultancy.types.farm'), icon: 'agriculture' },
   ];
 
   const tags = [
@@ -92,9 +101,12 @@ export const Consultancy = () => {
         .eq('user_id', user.id)
         .order('created_at', { ascending: false });
 
-      // Apply type filter
+      // Apply type filters
       if (selectedType) {
         query = query.eq('unit_type', selectedType);
+      }
+      if (selectedDevType) {
+        query = query.eq('unit_type', selectedDevType);
       }
 
       // Apply status filter
@@ -219,26 +231,56 @@ export const Consultancy = () => {
             </div>
           </div>
 
-          {/* Type Filter */}
-          <div className="lg:col-span-8 space-y-2">
-            <label className="block text-sm font-label font-bold text-on-surface uppercase tracking-wider">
-              {t('consultancy.search_by_type')}
-            </label>
-            <div className="flex flex-wrap gap-2">
-              {propertyTypes.map((type) => (
-                <button
-                  key={type.id}
-                  onClick={() => toggleType(type.id)}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-full border-2 transition-all font-body text-xs font-medium ${
-                    selectedType === type.id
-                      ? 'bg-primary border-primary text-on-primary shadow-lg shadow-primary/20'
-                      : 'bg-surface-container-high border-transparent text-on-surface-variant hover:border-outline-variant'
-                  }`}
-                >
-                  <span className="material-symbols-outlined text-base">{type.icon}</span>
-                  {type.label}
-                </button>
-              ))}
+          {/* Type Filters */}
+          <div className="lg:col-span-8 space-y-6">
+            <div className="space-y-2">
+              <label className="block text-[10px] font-black uppercase tracking-widest text-on-surface-variant">
+                Tipo de Imóvel / Unidade
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {propertyTypes.map((type) => (
+                  <button
+                    key={type.id}
+                    onClick={() => {
+                      setSelectedType(prev => prev === type.id ? "" : type.id);
+                      setSelectedDevType("");
+                    }}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-full border-2 transition-all font-body text-xs font-medium ${
+                      selectedType === type.id
+                        ? 'bg-primary border-primary text-on-primary shadow-lg shadow-primary/20'
+                        : 'bg-surface-container-high border-transparent text-on-surface-variant hover:border-outline-variant'
+                    }`}
+                  >
+                    <span className="material-symbols-outlined text-base">{type.icon}</span>
+                    {type.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="block text-[10px] font-black uppercase tracking-widest text-on-surface-variant">
+                Tipo de Empreendimento / Área
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {developmentTypes.map((type) => (
+                  <button
+                    key={type.id}
+                    onClick={() => {
+                      setSelectedDevType(prev => prev === type.id ? "" : type.id);
+                      setSelectedType("");
+                    }}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-full border-2 transition-all font-body text-xs font-medium ${
+                      selectedDevType === type.id
+                        ? 'bg-tertiary border-tertiary text-on-tertiary shadow-lg shadow-tertiary/20'
+                        : 'bg-surface-container-high border-transparent text-on-surface-variant hover:border-outline-variant'
+                    }`}
+                  >
+                    <span className="material-symbols-outlined text-base">{type.icon}</span>
+                    {type.label}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         </div>
@@ -359,7 +401,7 @@ export const Consultancy = () => {
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
                     />
                     <div className="absolute top-4 left-4 backdrop-blur px-3 py-1 rounded-full text-[10px] font-bold bg-primary/90 text-on-primary uppercase tracking-widest">
-                      {['land', 'mixed', 'commercial_center', 'residential_center', 'dormitory', 'studio', 'commercial', 'house'].includes(prop.unit_type) 
+                      {['land', 'mixed', 'commercial_center', 'residential_center', 'dormitory', 'studio', 'commercial', 'house', 'farm'].includes(prop.unit_type) 
                         ? t(`consultancy.types.${prop.unit_type}`) 
                         : t('nav.developments')}
                     </div>
@@ -413,4 +455,3 @@ export const Consultancy = () => {
     </div>
   );
 };
-

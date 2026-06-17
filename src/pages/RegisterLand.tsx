@@ -63,7 +63,39 @@ export const RegisterLand = () => {
           
           if (error) throw error;
           
-          reset(data);
+          // Parse location string into street, city, state if separate columns are empty
+          let street = data.street || "";
+          let city = data.city || "";
+          let state = data.state || "";
+          
+          if (!street && !city && !state && data.location) {
+            const parts = data.location.split(" - ");
+            if (parts.length === 2) {
+              state = parts[1];
+              const streetCity = parts[0].split(", ");
+              if (streetCity.length === 2) {
+                street = streetCity[0];
+                city = streetCity[1];
+              } else {
+                street = parts[0];
+              }
+            } else {
+              const streetCity = data.location.split(", ");
+              if (streetCity.length === 2) {
+                street = streetCity[0];
+                city = streetCity[1];
+              } else {
+                street = data.location;
+              }
+            }
+          }
+
+          reset({
+            ...data,
+            street,
+            city,
+            state
+          });
           setVideoUrls(data.video_url || []);
           setFloorPlans(data.floor_plan_url || []);
           setEbooks(data.ebook_url || []);
@@ -206,6 +238,7 @@ export const RegisterLand = () => {
                 <option value="commercial">Comercial</option>
                 <option value="industrial">Industrial</option>
                 <option value="mixed">Uso Misto</option>
+                <option value="farm">Chácara / Rural</option>
               </select>
             </div>
           </div>

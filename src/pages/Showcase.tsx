@@ -34,6 +34,7 @@ export const Showcase = () => {
     { id: 'mixed', label: 'Centro Empresarial e Residencial', icon: 'domain_add' },
     { id: 'commercial_center', label: 'Centro Empresarial', icon: 'business_center' },
     { id: 'residential_center', label: 'Centro Residencial', icon: 'apartment' },
+    { id: 'farm', label: 'Chácara', icon: 'agriculture' },
   ];
 
   const tags = [
@@ -288,7 +289,7 @@ export const Showcase = () => {
                     <img src={prop.hero_image_url || "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?q=80&w=2070&auto=format&fit=crop"} alt={prop.title} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" />
                   )}
                   <div className="absolute top-4 left-4 bg-primary text-on-primary text-[10px] font-black uppercase tracking-[0.2em] px-3 py-1 rounded-full">
-                    {['dormitory', 'studio', 'commercial', 'house', 'land', 'mixed', 'commercial_center', 'residential_center'].includes(prop.unit_type) 
+                    {['dormitory', 'studio', 'commercial', 'house', 'land', 'mixed', 'commercial_center', 'residential_center', 'farm'].includes(prop.unit_type) 
                       ? t(`consultancy.types.${prop.unit_type}`) 
                       : 'Imóvel'}
                   </div>

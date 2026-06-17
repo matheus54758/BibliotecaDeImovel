@@ -139,6 +139,12 @@ export const NewDevelopment = () => {
             .single();
           
           if (propError) throw propError;
+
+          // If it's a land, redirect to the specialized land form
+          if (propData.unit_type === 'land') {
+            navigate(`/lands/edit/${id}`);
+            return;
+          }
           
           // Detect type from data if param is missing
           if (propData.parent_id === null && propData.builder_id === null) {
@@ -411,6 +417,7 @@ export const NewDevelopment = () => {
                     <option value="commercial">Comercial</option>
                     <option value="studio">Studio</option>
                     <option value="house">Casa</option>
+                    <option value="farm">Chácara</option>
                   </select>
                 </div>
               </div>

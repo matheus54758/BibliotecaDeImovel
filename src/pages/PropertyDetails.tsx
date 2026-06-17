@@ -443,9 +443,11 @@ export const PropertyDetails = () => {
         </ol>
         <div className="flex gap-2">
           <Link to={
-            property.parent_id !== null 
-              ? `/units/edit/${id}` 
-              : (isStandaloneProperty ? `/units/edit/${id}?type=property` : `/projects/edit/${id}?type=project`)
+            property.unit_type === 'land'
+              ? `/lands/edit/${id}`
+              : (property.parent_id !== null 
+                  ? `/units/edit/${id}` 
+                  : (isStandaloneProperty ? `/units/edit/${id}?type=property` : `/projects/edit/${id}?type=project`))
           }><button className="text-primary hover:bg-primary/10 p-2 rounded-full transition-colors flex items-center gap-2"><span className="material-symbols-outlined">edit</span><span className="text-sm font-medium">{t('common.edit')}</span></button></Link>
           <button onClick={handleDelete} disabled={deleting} className="text-error hover:bg-error/10 p-2 rounded-full transition-colors flex items-center gap-2"><span className="material-symbols-outlined">{deleting ? 'sync' : 'delete'}</span><span className="text-sm font-medium">{deleting ? t('common.deleting') : t('common.delete')}</span></button>
         </div>
@@ -454,7 +456,7 @@ export const PropertyDetails = () => {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 px-4">
         <div className="lg:col-span-8 space-y-12">
           <div className="space-y-4">
-            <div className="relative h-[614px] min-h-[500px] w-full bg-surface-container-low rounded-xl overflow-hidden group cursor-zoom-in" onClick={() => setSelectedMedia({ url: property.hero_image_url || "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?q=80&w=2070&auto=format&fit=crop", type: property.hero_image_url?.match(/\.pdf$/i) ? 'image' : 'image' })}>
+            <div className="relative h-64 sm:h-96 md:h-[500px] lg:h-[614px] w-full bg-surface-container-low rounded-xl overflow-hidden group cursor-zoom-in" onClick={() => setSelectedMedia({ url: property.hero_image_url || "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?q=80&w=2070&auto=format&fit=crop", type: property.hero_image_url?.match(/\.pdf$/i) ? 'image' : 'image' })}>
               {property.hero_image_url?.match(/\.pdf$/i) ? (
                 <div className="w-full h-full flex flex-col items-center justify-center text-primary bg-primary/5">
                   <span className="material-symbols-outlined text-[120px]">picture_as_pdf</span>
@@ -785,13 +787,13 @@ export const PropertyDetails = () => {
             </div>
 
             {subUnits.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
                 {subUnits.map((unit) => (
-                  <article key={unit.id} className="bg-surface-container-low rounded-xl p-6 flex flex-col justify-between border border-transparent hover:border-primary/20 transition-all group">
+                  <article key={unit.id} className="bg-surface-container-low rounded-xl p-6 flex flex-col justify-between border border-transparent hover:border-primary/20 transition-all group shadow-sm">
                     <div>
-                      <div className="flex justify-between items-start mb-2">
-                        <h3 className={`font-headline font-bold text-lg leading-tight ${unit.title?.includes('(INDISPONÍVEL)') ? 'text-on-surface/40' : 'text-on-surface group-hover:text-primary'}`}>{unit.title}</h3>
-                        <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border ${getStatusColor(unit.status, unit.title)}`}>
+                      <div className="flex flex-col sm:flex-row justify-between items-start gap-2 mb-2">
+                        <h3 className={`font-headline font-bold text-lg leading-tight break-words max-w-full ${unit.title?.includes('(INDISPONÍVEL)') ? 'text-on-surface/40' : 'text-on-surface group-hover:text-primary'}`}>{unit.title}</h3>
+                        <span className={`shrink-0 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border ${getStatusColor(unit.status, unit.title)}`}>
                           {unit.title?.includes('(INDISPONÍVEL)') ? t('status.unavailable') : t(`status.${unit.status}`)}
                         </span>
                       </div>

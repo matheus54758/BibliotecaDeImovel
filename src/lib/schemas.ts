@@ -12,8 +12,8 @@ export const builderSchema = z.object({
   email: z.string().email("Invalid corporate email"),
   phone: z.string().min(10, "Invalid phone number"),
   address: z.string().min(5, "Address is required"),
-  city: z.string().optional(),
-  logo_url: z.string().url("Logo must be a valid URL").optional().or(z.literal("")),
+  city: z.string().nullable().optional(),
+  logo_url: z.string().url("Logo must be a valid URL").nullable().optional().or(z.literal("")),
 });
 
 export const developmentSchema = z.object({
