@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { useTranslation } from 'react-i18next';
 import { jsPDF } from 'jspdf';
 import { supabase } from '../lib/supabase';
 import { useTheme } from '../hooks/useTheme';
@@ -17,7 +16,6 @@ interface ViabilidadeResult {
 
 export const LotAnalyzer = () => {
   const { theme } = useTheme();
-  const { t } = useTranslation();
   const [iptu, setIptu] = useState('');
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);

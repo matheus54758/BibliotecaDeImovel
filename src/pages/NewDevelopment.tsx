@@ -8,7 +8,6 @@ import { Button } from "../components/Button";
 import { MediaUpload } from "../components/MediaUpload";
 import { InputField } from "../components/InputField";
 import { developmentSchema, type DevelopmentInput } from "../lib/schemas";
-import { cn } from '../lib/utils';
 
 export const NewDevelopment = () => {
   const { t } = useTranslation();
@@ -28,20 +27,6 @@ export const NewDevelopment = () => {
   const [floorLayouts, setFloorLayouts] = useState<string[]>([]);
   const [ebooks, setEbooks] = useState<string[]>([]);
   const [parentId, setParentId] = useState<string | null>(parentIdFromUrl);
-
-  const [cropperConfig, setCropperConfig] = useState<{ isOpen: boolean, type: 'plans' | 'layouts', pdfUrl: string | null }>({
-    isOpen: false,
-    type: 'plans',
-    pdfUrl: null
-  });
-
-  const handleOpenCropper = (type: 'plans' | 'layouts') => {
-    if (ebooks.length === 0) {
-      alert("Por favor, faça o upload de um documento PDF primeiro na seção 'Documentos / E-books'.");
-      return;
-    }
-    setCropperConfig({ isOpen: true, type, pdfUrl: ebooks[0] });
-  };
 
   const {
     register,

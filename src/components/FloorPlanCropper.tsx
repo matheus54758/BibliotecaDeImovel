@@ -3,7 +3,6 @@ import * as pdfjs from 'pdfjs-dist';
 import { Cropper, type ReactCropperElement } from 'react-cropper';
 import 'cropperjs/dist/cropper.css';
 import { Button } from './Button';
-import { supabase } from '../lib/supabase';
 import pdfWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 
 // Setup worker

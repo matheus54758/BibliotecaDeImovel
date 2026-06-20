@@ -10,7 +10,6 @@ import { useTheme } from "../hooks/useTheme";
 import { FloorPlanCropper } from "../components/FloorPlanCropper";
 import { InvestmentSimulatorModal } from "../components/InvestmentSimulatorModal";
 
-import { cn } from "../lib/utils";
 import * as pdfjsLib from 'pdfjs-dist';
 import pdfWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 
@@ -92,7 +91,7 @@ export const PropertyDetails = () => {
            if (context) {
              canvas.width = viewport.width;
              canvas.height = viewport.height;
-             await page.render({ canvasContext: context, viewport }).promise;
+             await page.render({ canvasContext: context, viewport } as any).promise;
              // JPG com compressão 0.8 garante arquivo muito leve
              const base64 = canvas.toDataURL('image/jpeg', 0.8).split(',')[1];
              batchImages.push({ index: j, base64, mimeType: 'image/jpeg' });
@@ -139,7 +138,7 @@ export const PropertyDetails = () => {
       const blob = await res.blob();
       const fileName = `${id}/${Date.now()}-plan.jpg`;
       
-      const { data: uploadData, error: uploadError } = await supabase.storage
+      const { error: uploadError } = await supabase.storage
         .from('assets')
         .upload(fileName, blob, { contentType: 'image/jpeg' });
         
