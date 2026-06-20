@@ -26,8 +26,12 @@ export const TopNavBar = () => {
     { name: t('nav.overview'), icon: 'dashboard', path: '/' },
     { name: t('nav.project_developments'), icon: 'corporate_fare', path: '/project-developments' },
     { name: t('nav.developments'), icon: 'apartment', path: '/developments' },
+    { name: t('nav.lands'), icon: 'landscape', path: '/lands' },
     { name: t('nav.construction'), icon: 'engineering', path: '/builders' },
     { name: t('nav.consultancy'), icon: 'business_center', path: '/consultancy' },
+    { name: t('nav.clients'), icon: 'person_search', path: '/clients' },
+    { name: 'Viabilidade (IPTU)', icon: 'explore', path: '/lot-analyzer' },
+    { name: 'Personalização', icon: 'palette', path: '/settings/branding' },
   ];
 
   const changeLanguage = (code: string) => {
@@ -217,7 +221,7 @@ export const TopNavBar = () => {
           </button>
         </div>
 
-        <div className="flex-1 px-4 py-6 space-y-1">
+        <div className="flex-1 px-4 py-6 space-y-1 overflow-y-auto">
           {navItems.map((item) => (
             <NavLink
               key={item.path}

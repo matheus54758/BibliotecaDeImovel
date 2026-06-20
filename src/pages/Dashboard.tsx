@@ -413,7 +413,14 @@ export const Dashboard = () => {
             Bem-vindo de volta! Aqui está um resumo do seu portfólio.
           </p>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex flex-wrap items-center gap-4">
+          <button 
+            onClick={() => alert("Como instalar o App:\n\n📱 iPhone (Safari): Toque no botão Compartilhar (quadrado com seta para cima) na parte inferior da tela e escolha 'Adicionar à Tela de Início'.\n\n🤖 Android (Chrome): Toque nos 3 pontinhos no canto superior direito e escolha 'Adicionar à tela inicial'.\n\nPronto! O ícone do Lumis ficará na sua tela igual a um app normal e funcionará em tela cheia.")}
+            className="flex items-center gap-2 px-6 py-2 rounded-full font-bold bg-surface-container-high text-on-surface hover:bg-surface-container-highest transition-all shadow-sm"
+          >
+            <span className="material-symbols-outlined text-lg">install_mobile</span>
+            App no Celular
+          </button>
           <button 
             onClick={handleShareShowcase}
             className="flex items-center gap-2 px-6 py-2 rounded-full font-bold bg-primary/10 text-primary hover:bg-primary/20 transition-all border border-primary/20 shadow-sm"
