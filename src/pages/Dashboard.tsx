@@ -36,7 +36,8 @@ export const Dashboard = () => {
     builders: 0,
     projects: 0,
     units: 0,
-    properties: 0
+    properties: 0,
+    leads: 0
   });
   const [loading, setLoading] = useState(true);
   const [showPricing, setShowPricing] = useState(false);
@@ -49,21 +50,23 @@ export const Dashboard = () => {
         if (!user) return;
 
         // 1. Fetch Stats
-        const [buildersRes, developmentsRes] = await Promise.all([
+        const [buildersRes, developmentsRes, interactionsRes] = await Promise.all([
           supabase.from('builders').select('id', { count: 'exact', head: true }).eq('user_id', user.id),
-          supabase.from('developments').select('id, parent_id, builder_id').eq('user_id', user.id)
+          supabase.from('developments').select('id, parent_id, builder_id, unit_type').eq('user_id', user.id),
+          supabase.from('client_interactions').select('id', { count: 'exact', head: true }).eq('user_id', user.id)
         ]);
 
         const devData = developmentsRes.data || [];
-        const projects = devData.filter(d => d.parent_id === null && d.builder_id !== null).length;
+        const projects = devData.filter(d => d.parent_id === null && d.builder_id !== null && d.unit_type !== 'land').length;
         const units = devData.filter(d => d.parent_id !== null).length;
-        const properties = devData.filter(d => d.parent_id === null && d.builder_id === null).length;
+        const properties = devData.filter(d => d.parent_id === null && d.builder_id === null && d.unit_type !== 'land').length;
 
         setStats({
           builders: buildersRes.count || 0,
           projects,
           units,
-          properties
+          properties,
+          leads: interactionsRes.count || 0
         });
 
         // 2. Fetch Revenue for Chart
@@ -81,25 +84,52 @@ export const Dashboard = () => {
         // Latest Additions
         const { data: latestProp } = await supabase
           .from('developments')
-          .select('id, title, created_at, hero_image_url, parent_id')
+          .select('id, title, created_at, hero_image_url, parent_id, unit_type')
           .eq('user_id', user.id)
           .order('created_at', { ascending: false })
           .limit(3);
 
         latestProp?.forEach(p => {
+          let label = p.parent_id ? 'Nova Unidade' : 'Novo Imóvel/Projeto';
+          if (p.unit_type === 'land') label = 'Novo Terreno';
+
           recentActivities.push({
             id: p.id,
             type: 'addition',
-            label: p.parent_id ? 'Nova Unidade' : 'Novo Imóvel/Projeto',
+            label: label,
             description: p.title,
             created_at: p.created_at,
             image: p.hero_image_url,
-            icon: 'add_circle',
-            color: 'bg-emerald-500/10 text-emerald-500'
+            icon: p.unit_type === 'land' ? 'landscape' : 'add_circle',
+            color: p.unit_type === 'land' ? 'bg-amber-500/10 text-amber-500' : 'bg-emerald-500/10 text-emerald-500'
           });
         });
 
-        setActivities(recentActivities.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()));
+        // Latest Interactions
+        const { data: latestInteractions } = await supabase
+          .from('client_interactions')
+          .select('id, client_name, created_at, developments(title)')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(3);
+
+        latestInteractions?.forEach(i => {
+          const propertyTitle = Array.isArray(i.developments) 
+            ? i.developments[0]?.title 
+            : (i.developments as any)?.title;
+
+          recentActivities.push({
+            id: i.id,
+            type: 'interaction',
+            label: 'Novo Atendimento',
+            description: `${i.client_name} - ${propertyTitle || 'Interesse geral'}`,
+            created_at: i.created_at,
+            icon: 'person_search',
+            color: 'bg-primary/10 text-primary'
+          });
+        });
+
+        setActivities(recentActivities.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()).slice(0, 5));
 
       } catch (error) {
         console.error("Error fetching dashboard data:", error);
@@ -217,8 +247,11 @@ export const Dashboard = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
       
+      const { data: profile } = await supabase.from('profiles').select('slug').eq('id', user.id).single();
+      const identifier = profile?.slug || user.id;
+      
       const baseUrl = window.location.href.split('#')[0];
-      const showcaseUrl = `${baseUrl}#/vitrine/${user.id}`;
+      const showcaseUrl = `${baseUrl}#/${identifier}`;
       
       await navigator.clipboard.writeText(showcaseUrl);
       alert("Link da sua Vitrine copiado para a área de transferência!");
@@ -403,11 +436,12 @@ export const Dashboard = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-6 mb-12">
         <MetricCard title="Construtoras" value={stats.builders} icon="engineering" color="text-blue-500" />
         <MetricCard title="Empreendimentos" value={stats.projects} icon="apartment" color="text-indigo-500" />
         <MetricCard title="Unidades" value={stats.units} icon="meeting_room" color="text-emerald-500" />
         <MetricCard title="Imóveis" value={stats.properties} icon="home" color="text-amber-500" />
+        <MetricCard title="Atendimentos" value={stats.leads} icon="person_search" color="text-primary" />
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-8 mb-12">

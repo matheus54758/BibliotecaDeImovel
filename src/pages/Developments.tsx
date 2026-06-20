@@ -28,6 +28,7 @@ export const Developments = () => {
           .select('*')
           .eq('user_id', user.id)
           .is('parent_id', null) // Mostra apenas os prédios (pais)
+          .neq('unit_type', 'land') // Exclui terrenos da aba de imóveis
           .order('created_at', { ascending: false });
 
         if (builderId) {

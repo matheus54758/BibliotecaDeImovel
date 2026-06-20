@@ -6,12 +6,23 @@ import { Button } from "../components/Button";
 import { formatCurrency, formatNumber } from "../lib/utils";
 import { generatePropertyPDF } from "../lib/pdf";
 import { useUserTier } from "../hooks/useUserTier";
+import { useTheme } from "../hooks/useTheme";
+import { FloorPlanCropper } from "../components/FloorPlanCropper";
+import { InvestmentSimulatorModal } from "../components/InvestmentSimulatorModal";
+
+import { cn } from "../lib/utils";
+import * as pdfjsLib from 'pdfjs-dist';
+import pdfWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
+
+// Configuração do Worker do PDF.js compatível com Vite/Browser (Local via Vite)
+pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorker;
 
 export const PropertyDetails = () => {
   const { t } = useTranslation();
   const { id } = useParams();
   const navigate = useNavigate();
   const { tier } = useUserTier();
+  const { theme } = useTheme();
   const [property, setProperty] = useState<any>(null);
   const [amenities, setAmenities] = useState<any[]>([]);
   const [gallery, setGallery] = useState<any[]>([]);
@@ -21,7 +32,6 @@ export const PropertyDetails = () => {
   const [selectedMedia, setSelectedMedia] = useState<{url: string, type: 'image' | 'video'} | null>(null);
   const [processingPdf, setProcessingPdf] = useState(false);
   const [selling, setSelling] = useState(false);
-  const [isUpdateMode, setIsUpdateMode] = useState(false);
   const [updateReport, setUpdateReport] = useState<{
     unit: string;
     oldPrice: number;
@@ -29,6 +39,199 @@ export const PropertyDetails = () => {
     status: 'updated' | 'inserted' | 'no_change' | 'error';
     error?: string;
   }[] | null>(null);
+
+  const [isBulkModalOpen, setIsBulkModalOpen] = useState(false);
+  const [selectedUnits, setSelectedUnits] = useState<string[]>([]);
+  const [bulkPercent, setBulkPercent] = useState<number>(0);
+  const [bulkCubRate, setBulkCubRate] = useState<number>(0);
+  const [bulkProcessing, setBulkProcessing] = useState(false);
+  const [isFloorPlanModalOpen, setIsFloorPlanModalOpen] = useState(false);
+  const [isSimulatorOpen, setIsSimulatorOpen] = useState(false);
+  const [processingFloorPlanPdf, setProcessingFloorPlanPdf] = useState(false);
+  const [floorPlansExtracted, setFloorPlansExtracted] = useState<any[]>([]);
+  const [extractionProgress, setExtractionProgress] = useState({ current: 0, total: 0, message: "" });
+  const [floorPlanPdfUrl, setFloorPlanPdfUrl] = useState<string | null>(null);
+  const [activePlanToCrop, setActivePlanToCrop] = useState<any>(null);
+  const [croppedImagesToAssociate, setCroppedImagesToAssociate] = useState<{name: string, dataUrl: string} | null>(null);
+  const [associationSelectedUnits, setAssociationSelectedUnits] = useState<string[]>([]);
+  const [isAssociating, setIsAssociating] = useState(false);
+
+  const handleFloorPlanPdfUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setProcessingFloorPlanPdf(true);
+    setExtractionProgress({ current: 0, total: 0, message: "Iniciando motor visual..." });
+    setFloorPlansExtracted([]);
+    
+    try {
+      console.log("Iniciando leitura do PDF:", file.name, "Tamanho:", file.size);
+      const fileUrl = URL.createObjectURL(file);
+      setFloorPlanPdfUrl(fileUrl);
+      const loadingTask = pdfjsLib.getDocument({ url: fileUrl });
+      const pdf = await loadingTask.promise;
+      const numPages = pdf.numPages;
+      console.log("PDF carregado com sucesso. Total de páginas:", numPages);
+      
+      setExtractionProgress({ current: 0, total: numPages, message: "Fatiando páginas do PDF..." });
+
+      const batchSize = 5;
+      const allExtractedPlans = [];
+
+      for (let i = 1; i <= numPages; i += batchSize) {
+        const batchImages = [];
+        const endPage = Math.min(i + batchSize - 1, numPages);
+        
+        setExtractionProgress({ current: i, total: numPages, message: `Renderizando imagens: Páginas ${i} a ${endPage}` });
+        
+        for (let j = i; j <= endPage; j++) {
+           const page = await pdf.getPage(j);
+           const viewport = page.getViewport({ scale: 1.5 }); // Escala 1.5 para boa legibilidade
+           const canvas = document.createElement('canvas');
+           const context = canvas.getContext('2d');
+           if (context) {
+             canvas.width = viewport.width;
+             canvas.height = viewport.height;
+             await page.render({ canvasContext: context, viewport }).promise;
+             // JPG com compressão 0.8 garante arquivo muito leve
+             const base64 = canvas.toDataURL('image/jpeg', 0.8).split(',')[1];
+             batchImages.push({ index: j, base64, mimeType: 'image/jpeg' });
+           }
+        }
+        
+        setExtractionProgress({ current: endPage, total: numPages, message: `Analisando páginas ${i} a ${endPage} com IA...` });
+        
+        const { data, error } = await supabase.functions.invoke('process-floor-plans-ai', {
+           body: { images: batchImages }
+        });
+
+        if (error) throw error;
+        if (data?.error) throw new Error(data.details || data.error);
+        if (data?.plans) {
+           allExtractedPlans.push(...data.plans);
+        }
+      }
+
+      setFloorPlansExtracted(allExtractedPlans);
+      setExtractionProgress({ current: numPages, total: numPages, message: "Mágica concluída!" });
+      
+      if (allExtractedPlans.length === 0) {
+        URL.revokeObjectURL(fileUrl); // Limpar se não encontrou nada
+        setFloorPlanPdfUrl(null);
+      }
+
+    } catch (error: any) {
+      console.error("ERRO FATAL NA EXTRAÇÃO VISUAL:", error);
+      alert("Erro na extração visual: " + error.message);
+    } finally {
+      setProcessingFloorPlanPdf(false);
+      // Reset input value to allow selecting same file again
+      e.target.value = '';
+    }
+  };
+
+  const handleAssociateImageToUnits = async () => {
+    if (!croppedImagesToAssociate || associationSelectedUnits.length === 0) return;
+    setIsAssociating(true);
+    
+    try {
+      const res = await fetch(croppedImagesToAssociate.dataUrl);
+      const blob = await res.blob();
+      const fileName = `${id}/${Date.now()}-plan.jpg`;
+      
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('assets')
+        .upload(fileName, blob, { contentType: 'image/jpeg' });
+        
+      if (uploadError) throw uploadError;
+      
+      const { data: { publicUrl } } = supabase.storage
+        .from('assets')
+        .getPublicUrl(fileName);
+        
+      for (const unitId of associationSelectedUnits) {
+        const unit = subUnits.find(u => u.id === unitId);
+        if (unit) {
+          const currentUrls = unit.floor_plan_url || [];
+          await supabase.from('developments').update({
+            floor_plan_url: [...currentUrls, publicUrl]
+          }).eq('id', unitId);
+        }
+      }
+      
+      fetchSubUnits();
+      alert("Planta associada com sucesso!");
+      setCroppedImagesToAssociate(null);
+      setAssociationSelectedUnits([]);
+      
+    } catch (err: any) {
+      console.error(err);
+      alert("Erro ao associar planta: " + err.message);
+    } finally {
+      setIsAssociating(false);
+    }
+  };
+
+  const handleSelectUnit = (unitId: string) => {
+    setSelectedUnits(prev => prev.includes(unitId) ? prev.filter(id => id !== unitId) : [...prev, unitId]);
+  };
+
+  const handleSelectAll = () => {
+    if (selectedUnits.length === subUnits.length) setSelectedUnits([]);
+    else setSelectedUnits(subUnits.map(u => u.id));
+  };
+
+  const handleSelectByType = (type: string) => {
+    const unitsOfType = subUnits.filter(u => u.unit_type === type).map(u => u.id);
+    const currentlySelected = unitsOfType.every(id => selectedUnits.includes(id));
+    
+    if (currentlySelected) {
+       // Se já estão todos selecionados, remove da lista
+       setSelectedUnits(prev => prev.filter(id => !unitsOfType.includes(id)));
+    } else {
+       // Se não, adiciona todos
+       setSelectedUnits(prev => Array.from(new Set([...prev, ...unitsOfType])));
+    }
+  };
+
+  const handleBulkUpdate = async () => {
+    if (selectedUnits.length === 0) return;
+    setBulkProcessing(true);
+    try {
+      const unitsToUpdate = subUnits.filter(u => selectedUnits.includes(u.id));
+      const report: any[] = [];
+      
+      for (const unit of unitsToUpdate) {
+        const updates: any = {};
+        if (bulkPercent !== 0) {
+          updates.price_starting_at = unit.price_starting_at * (1 + bulkPercent / 100);
+        }
+        if (bulkCubRate !== 0) {
+          updates.cub_monthly_rate = bulkCubRate;
+        }
+
+        if (Object.keys(updates).length > 0) {
+          const { error } = await supabase.from('developments').update(updates).eq('id', unit.id);
+          if (!error) {
+             report.push({ unit: unit.title, oldPrice: unit.price_starting_at, newPrice: updates.price_starting_at || unit.price_starting_at, status: 'updated' });
+          } else {
+             report.push({ unit: unit.title, status: 'error', error: error.message });
+          }
+        }
+      }
+      
+      setIsBulkModalOpen(false);
+      setBulkPercent(0);
+      setBulkCubRate(0);
+      setSelectedUnits([]);
+      setUpdateReport(report);
+      fetchSubUnits();
+    } catch (e: any) {
+      alert("Erro ao atualizar em massa: " + e.message);
+    } finally {
+      setBulkProcessing(false);
+    }
+  };
 
   const handleMarkAsSold = async () => {
     if (!property || selling) return;
@@ -105,13 +308,34 @@ export const PropertyDetails = () => {
 
     setProcessingPdf(true);
     try {
+      // Lendo o PDF no navegador usando pdfjsLib para evitar timeout no servidor
       const arrayBuffer = await file.arrayBuffer();
+      const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) }).promise;
+      let extractedText = "";
+      
+      for (let i = 1; i <= pdf.numPages; i++) {
+        const page = await pdf.getPage(i);
+        const textContent = await page.getTextContent();
+        
+        let lastY = -1;
+        textContent.items.forEach((item: any) => {
+          // Detecta mudança de linha baseado na coordenada Y
+          if (lastY !== item.transform[5]) {
+            extractedText += '\n';
+            lastY = item.transform[5];
+          }
+          // Adiciona o texto com espaçamento para preservar a tabela visual
+          extractedText += item.str + '  '; 
+        });
+        extractedText += '\n\n---FIM DA PÁGINA---\n\n';
+      }
+
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("User not authenticated");
 
       const { data: extractedData, error: funcError } = await supabase.functions.invoke('process-pdf-units', {
-        body: arrayBuffer,
-        headers: { 'Content-Type': 'application/pdf' }
+        body: JSON.stringify({ pdfText: extractedText }),
+        headers: { 'Content-Type': 'application/json' }
       });
 
       if (funcError) throw funcError;
@@ -187,11 +411,12 @@ export const PropertyDetails = () => {
         const finalType = normalizeType(unit.unit_type, unit.description);
         
         const parking = Math.max(0, Number(unit.parking_spaces) || 0);
+        const price = cleanNumber(unit.price_starting_at);
         
         return {
           title: `${String(unit.title || "Unidade").trim()}${status === 'sold' ? ' (VENDIDO)' : status === 'reserved' ? ' (RESERVADO)' : ''}`,
           sq_ft: area,
-          price_starting_at: cleanNumber(unit.price_starting_at),
+          price_starting_at: price,
           status: status,
           bedrooms: bedrooms,
           bathrooms: Math.max(1, Number(unit.bathrooms) || 0),
@@ -203,6 +428,16 @@ export const PropertyDetails = () => {
           payment_reinforcement_value: cleanNumber(unit.payment_reinforcement_value),
           payment_reinforcement_count: Math.max(0, Number(unit.payment_reinforcement_count) || 0),
           payment_post_construction: cleanNumber(unit.payment_post_construction),
+          
+          // Cálculos Automáticos de Investimento (ROI) baseados no Preço da Unidade
+          roi_appreciation_1y: 15,
+          roi_appreciation_2y: 12,
+          roi_appreciation_3y: 10,
+          rent_seasonal: price * 0.01,
+          rent_annual: price * 0.005,
+          sale_value_after_keys: price * 1.30,
+          cub_monthly_rate: 0,
+          months_until_keys: 0,
           description: String(unit.description || unit.unit_type || "Unidade importada via PDF").trim(),
           builder_id: property.builder_id,
           parent_id: id,
@@ -232,15 +467,19 @@ export const PropertyDetails = () => {
         .eq('parent_id', id);
 
       const existingMap = new Map();
-      existingUnits?.forEach(u => existingMap.set(u.title, u));
+      existingUnits?.forEach(u => {
+        const cleanTitle = u.title.replace(' (VENDIDO)', '').replace(' (RESERVADO)', '').trim();
+        existingMap.set(cleanTitle, u);
+      });
 
       const report: any[] = [];
       let successCount = 0;
 
       for (const unit of unitsToInsert) {
-        const existing = existingMap.get(unit.title);
+        const cleanSearchTitle = unit.title.replace(' (VENDIDO)', '').replace(' (RESERVADO)', '').trim();
+        const existing = existingMap.get(cleanSearchTitle);
 
-        if (existing && isUpdateMode) {
+        if (existing) {
           // Comparar preços
           const oldPrice = existing.price_starting_at || 0;
           const newPrice = unit.price_starting_at || 0;
@@ -557,6 +796,134 @@ export const PropertyDetails = () => {
                 </div>
               </section>
             )}
+
+            {showPaymentPlan && (property.roi_appreciation_1y > 0 || property.rent_annual > 0 || property.rent_seasonal > 0 || property.sale_value_after_keys > 0 || property.cub_monthly_rate > 0) && (
+              <section className="bg-gradient-to-br from-emerald-900 via-emerald-800 to-teal-900 p-[2px] rounded-2xl shadow-2xl relative overflow-hidden group">
+                {/* Efeito Ouro Premium */}
+                <div className="absolute inset-0 bg-gradient-to-tr from-yellow-400/20 via-transparent to-yellow-400/20 opacity-0 group-hover:opacity-100 transition-opacity duration-700"></div>
+                
+                <div className="bg-surface-container-lowest/95 backdrop-blur-3xl h-full w-full rounded-2xl p-6 md:p-10 relative z-10">
+                  <div className="absolute top-0 right-0 p-8 opacity-5">
+                    <span className="material-symbols-outlined text-[120px] text-emerald-600">moving</span>
+                  </div>
+                  
+                  <div className="flex flex-col md:flex-row items-start md:items-center gap-4 mb-10">
+                    <div className="w-14 h-14 rounded-full bg-emerald-500/10 flex items-center justify-center border border-emerald-500/30 shrink-0">
+                      <span className="material-symbols-outlined text-emerald-600 text-3xl">insights</span>
+                    </div>
+                    <div>
+                      <h2 className="text-3xl font-headline font-black text-on-surface tracking-tight">
+                        Potencial de Investimento
+                      </h2>
+                      <p className="text-emerald-600 font-bold tracking-widest uppercase text-xs mt-1">Análise de Rentabilidade e Valorização</p>
+                    </div>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    {/* Card Valorização */}
+                    <div className="bg-surface-container-high rounded-xl p-6 border border-emerald-500/10 hover:border-emerald-500/30 transition-all shadow-sm relative overflow-hidden group/card">
+                      <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/5 rounded-bl-[100px] transition-transform group-hover/card:scale-110"></div>
+                      <h3 className="text-[10px] font-black text-on-surface-variant uppercase tracking-[0.2em] mb-6 flex items-center gap-2">
+                        <span className="material-symbols-outlined text-[18px] text-emerald-500">trending_up</span> Valorização
+                      </h3>
+                      <div className="space-y-4 relative z-10">
+                        {property.roi_appreciation_1y > 0 && (
+                          <div className="flex justify-between items-end">
+                            <span className="text-sm font-bold text-on-surface-variant">Em 1 Ano:</span>
+                            <span className="font-black text-3xl text-emerald-600 tracking-tighter">+{property.roi_appreciation_1y}%</span>
+                          </div>
+                        )}
+                        {property.roi_appreciation_2y > 0 && (
+                          <div className="flex justify-between items-end border-t border-outline-variant/10 pt-3">
+                            <span className="text-xs font-bold text-on-surface-variant">Em 2 Anos:</span>
+                            <span className="font-black text-xl text-emerald-600/80">+{property.roi_appreciation_2y}%</span>
+                          </div>
+                        )}
+                        {property.roi_appreciation_3y > 0 && (
+                          <div className="flex justify-between items-end border-t border-outline-variant/10 pt-3">
+                            <span className="text-xs font-bold text-on-surface-variant">Em 3 Anos:</span>
+                            <span className="font-black text-xl text-emerald-600/80">+{property.roi_appreciation_3y}%</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Card Rentabilidade */}
+                    <div className="bg-surface-container-high rounded-xl p-6 border border-amber-500/10 hover:border-amber-500/30 transition-all shadow-sm relative overflow-hidden group/card">
+                      <div className="absolute top-0 right-0 w-24 h-24 bg-amber-500/5 rounded-bl-[100px] transition-transform group-hover/card:scale-110"></div>
+                      <h3 className="text-[10px] font-black text-on-surface-variant uppercase tracking-[0.2em] mb-6 flex items-center gap-2">
+                        <span className="material-symbols-outlined text-[18px] text-amber-500">payments</span> Renda Passiva
+                      </h3>
+                      <div className="space-y-5 relative z-10">
+                        {property.rent_seasonal > 0 && (
+                          <div className="flex flex-col gap-1">
+                            <span className="text-[10px] font-black text-on-surface-variant uppercase tracking-widest">Locação Temporada</span>
+                            <div className="flex items-baseline gap-1">
+                              <span className="font-black text-3xl text-amber-600 tracking-tighter">{formatCurrency(property.rent_seasonal)}</span>
+                              <span className="text-[10px] text-on-surface-variant/70 font-bold uppercase tracking-wider">/mês est.</span>
+                            </div>
+                          </div>
+                        )}
+                        {property.rent_annual > 0 && (
+                          <div className="flex flex-col gap-1 border-t border-outline-variant/10 pt-4">
+                            <span className="text-[10px] font-black text-on-surface-variant uppercase tracking-widest">Locação Anual</span>
+                            <div className="flex items-baseline gap-1">
+                              <span className="font-black text-xl text-amber-600/80 tracking-tighter">{formatCurrency(property.rent_annual)}</span>
+                              <span className="text-[10px] text-on-surface-variant/70 font-bold uppercase tracking-wider">/mês est.</span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Card Finalização */}
+                    <div className="bg-gradient-to-br from-emerald-800 to-emerald-950 rounded-xl p-6 text-emerald-50 relative overflow-hidden shadow-inner flex flex-col justify-between group/card">
+                      <div className="absolute -right-8 -bottom-8 opacity-10 transition-transform duration-700 group-hover/card:scale-150 group-hover/card:rotate-12">
+                        <span className="material-symbols-outlined text-[150px]">diamond</span>
+                      </div>
+                      
+                      <div>
+                        <h3 className="text-[10px] font-black text-emerald-300 uppercase tracking-[0.2em] mb-6 flex items-center gap-2 relative z-10">
+                          <span className="material-symbols-outlined text-[18px]">account_balance</span> Projeção nas Chaves
+                        </h3>
+                        <div className="space-y-4 relative z-10">
+                          {property.sale_value_after_keys > 0 && (
+                            <div className="flex flex-col gap-1">
+                              <span className="text-xs font-bold text-emerald-200/80">Venda Estimada:</span>
+                              <span className="font-black text-4xl text-white drop-shadow-md tracking-tighter">{formatCurrency(property.sale_value_after_keys)}</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4 border-t border-emerald-700/50 pt-4 mt-6 relative z-10 bg-black/10 p-3 rounded-lg backdrop-blur-sm">
+                        {property.cub_monthly_rate > 0 && (
+                          <div className="flex flex-col gap-1">
+                            <span className="text-[9px] uppercase tracking-widest text-emerald-300 font-bold">Reajuste CUB</span>
+                            <span className="font-black text-lg text-emerald-50">+{property.cub_monthly_rate}%<span className="text-[9px] font-normal"> a.m.</span></span>
+                          </div>
+                        )}
+                        {property.months_until_keys > 0 && (
+                          <div className="flex flex-col gap-1">
+                            <span className="text-[9px] uppercase tracking-widest text-emerald-300 font-bold">Prazo Chaves</span>
+                            <span className="font-black text-lg text-emerald-50">{property.months_until_keys} m.</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="mt-10 pt-6 border-t border-outline-variant/10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+                    <p className="text-[10px] text-on-surface-variant/60 font-medium max-w-2xl uppercase tracking-wider leading-relaxed">
+                      * Projeções matemáticas baseadas no histórico do mercado. Valores e percentuais não garantem rentabilidade futura absoluta e sofrem variações de acordo com CUB/INCC.
+                    </p>
+                    <button onClick={() => setIsSimulatorOpen(true)} className="shrink-0 px-8 py-4 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black uppercase tracking-widest rounded-xl transition-all flex items-center gap-3 shadow-lg shadow-emerald-600/20 hover:shadow-emerald-600/40 hover:-translate-y-1">
+                      Simular Investimento <span className="material-symbols-outlined text-sm">arrow_forward</span>
+                    </button>
+                  </div>
+                </div>
+              </section>
+            )}
           </div>
 
           {(property.video_url?.length > 0 || property.ebook_url?.length > 0) && (
@@ -740,7 +1107,7 @@ export const PropertyDetails = () => {
                       {selling ? 'Registrando...' : (property.parent_id ? "Unidade Vendida" : "Imóvel Vendido")}
                     </Button>
                   )}
-                  <button onClick={() => generatePropertyPDF(property, amenities, gallery, subUnits)} className="w-full py-3 border-2 border-primary text-primary hover:bg-primary hover:text-on-primary transition-all rounded-md font-bold flex items-center justify-center gap-2"><span className="material-symbols-outlined">download</span>{t('common.download_pdf')}</button>
+                  <button onClick={() => generatePropertyPDF(property, amenities, gallery, subUnits, theme)} className="w-full py-3 border-2 border-primary text-primary hover:bg-primary hover:text-on-primary transition-all rounded-md font-bold flex items-center justify-center gap-2"><span className="material-symbols-outlined">download</span>{t('common.download_pdf')}</button>
                 </div>
               </div>
               {property.builders && (
@@ -764,34 +1131,40 @@ export const PropertyDetails = () => {
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-10 border-b border-outline-variant/20 pb-6">
               <div><h2 className="text-3xl font-headline font-bold text-on-surface mb-2 tracking-tight">Unidades do Empreendimento</h2><p className="text-on-surface-variant font-body">Gerencie as unidades e quartos deste prédio aqui.</p></div>
               <div className="flex flex-wrap gap-4 items-center">
-                <div className="flex items-center gap-2 px-4 py-2 bg-surface-container-high rounded-xl border border-outline-variant/30">
-                  <input 
-                    type="checkbox" 
-                    id="updateMode" 
-                    checked={isUpdateMode} 
-                    onChange={(e) => setIsUpdateMode(e.target.checked)}
-                    className="w-4 h-4 accent-primary cursor-pointer"
-                  />
-                  <label htmlFor="updateMode" className="text-[10px] font-black text-on-surface uppercase tracking-widest cursor-pointer select-none">
-                    Atualizar existentes
-                  </label>
-                </div>
+                <button onClick={() => setIsBulkModalOpen(true)} className="flex items-center gap-2 px-6 py-3 rounded-xl bg-surface-container-high border-2 border-outline-variant hover:border-primary hover:bg-primary/5 font-bold uppercase tracking-wider transition-all shadow-sm">
+                  <span className="material-symbols-outlined text-primary">edit_square</span>Atualização em Massa {selectedUnits.length > 0 && `(${selectedUnits.length})`}
+                </button>
+
                 <Link to={`/developments/new?parentId=${id}`} className="flex items-center gap-3 px-6 py-3 rounded-xl bg-primary text-on-primary font-bold uppercase tracking-wider hover:opacity-90 transition-all sunken-shadow">
                   <span className="material-symbols-outlined">add_circle</span>Adicionar Unidade
                 </Link>
-                <label className={`flex items-center gap-3 px-6 py-3 rounded-xl cursor-pointer transition-all duration-300 border-2 border-dashed ${processingPdf ? 'bg-primary/5 border-primary/40 animate-pulse' : 'bg-surface-container-high border-outline-variant hover:border-primary hover:bg-surface-bright'}`}>
-                  {processingPdf ? (<><div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary"></div><span className="text-sm font-bold text-primary uppercase tracking-wider">Extraindo...</span></>) : (<><span className="material-symbols-outlined text-primary">upload_file</span><span className="text-sm font-bold text-on-surface uppercase tracking-wider">Importar PDF</span></>)}
+
+                <label title="Atualiza preços existentes ou cadastra novas unidades automaticamente" className={`flex items-center gap-3 px-6 py-3 rounded-xl cursor-pointer transition-all duration-300 border-2 border-dashed ${processingPdf ? 'bg-primary/5 border-primary/40 animate-pulse' : 'bg-surface-container-high border-outline-variant hover:border-primary hover:bg-surface-bright'}`}>
+                  {processingPdf ? (<><div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary"></div><span className="text-sm font-bold text-primary uppercase tracking-wider">Extraindo...</span></>) : (<><span className="material-symbols-outlined text-primary">upload_file</span><span className="text-sm font-bold text-on-surface uppercase tracking-wider">Importar Tabela PDF</span></>)}
                   <input type="file" className="hidden" accept=".pdf" onChange={handlePdfUpload} disabled={processingPdf} />
                 </label>
+                
+                <button onClick={() => setIsFloorPlanModalOpen(true)} className="flex items-center gap-3 px-6 py-3 rounded-xl bg-surface-container-high border-2 border-outline-variant hover:border-primary hover:bg-surface-bright font-bold uppercase tracking-wider transition-all shadow-sm">
+                  <span className="material-symbols-outlined text-primary">architecture</span>Importar Plantas (PDF)
+                </button>
               </div>
             </div>
 
             {subUnits.length > 0 ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
-                {subUnits.map((unit) => (
-                  <article key={unit.id} className="bg-surface-container-low rounded-xl p-6 flex flex-col justify-between border border-transparent hover:border-primary/20 transition-all group shadow-sm">
-                    <div>
-                      <div className="flex flex-col sm:flex-row justify-between items-start gap-2 mb-2">
+              <div className="space-y-4">
+                <div className="flex justify-end px-2">
+                  <button onClick={handleSelectAll} className="text-xs font-bold text-primary uppercase tracking-widest hover:underline">
+                    {selectedUnits.length === subUnits.length ? "Desmarcar Todas" : "Selecionar Todas"}
+                  </button>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
+                  {subUnits.map((unit) => (
+                    <article key={unit.id} className={`relative bg-surface-container-low rounded-xl p-6 flex flex-col justify-between border-2 transition-all group shadow-sm ${selectedUnits.includes(unit.id) ? 'border-primary bg-primary/5' : 'border-transparent hover:border-primary/20'}`}>
+                      <div className="absolute top-4 right-4 z-10">
+                        <input type="checkbox" checked={selectedUnits.includes(unit.id)} onChange={() => handleSelectUnit(unit.id)} className="w-5 h-5 accent-primary cursor-pointer shadow-sm rounded-sm" />
+                      </div>
+                      <div className="pr-8">
+                        <div className="flex flex-col sm:flex-row justify-between items-start gap-2 mb-2">
                         <h3 className={`font-headline font-bold text-lg leading-tight break-words max-w-full ${unit.title?.includes('(INDISPONÍVEL)') ? 'text-on-surface/40' : 'text-on-surface group-hover:text-primary'}`}>{unit.title}</h3>
                         <span className={`shrink-0 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border ${getStatusColor(unit.status, unit.title)}`}>
                           {unit.title?.includes('(INDISPONÍVEL)') ? t('status.unavailable') : t(`status.${unit.status}`)}
@@ -859,12 +1232,109 @@ export const PropertyDetails = () => {
                   </article>
                 ))}
               </div>
+            </div>
             ) : (
               <div className="py-20 text-center bg-surface-container-low/50 rounded-2xl border-2 border-dashed border-outline-variant/20"><span className="material-symbols-outlined text-6xl text-on-surface/10 mb-4 italic">apartment</span><p className="text-on-surface-variant font-body text-lg italic">Nenhuma unidade cadastrada neste empreendimento ainda.</p><p className="text-sm text-on-surface/40 mt-2">Use o botão acima para importar unidades via PDF.</p></div>
             )}
           </section>
         </div>
       )}
+
+      {isBulkModalOpen && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-300">
+          <div className="bg-surface-container-lowest w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden flex flex-col sunken-shadow border border-outline-variant/10">
+            <div className="p-8 border-b border-outline-variant/10 flex justify-between items-center bg-surface-container-low">
+              <div>
+                <h2 className="text-2xl font-headline font-bold text-on-surface">Atualização em Massa</h2>
+                <p className="text-sm text-on-surface-variant font-body mt-1">
+                  Atualize {selectedUnits.length} unidade(s) selecionada(s).
+                </p>
+              </div>
+              <button onClick={() => setIsBulkModalOpen(false)} className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-surface-container-high transition-colors">
+                <span className="material-symbols-outlined text-on-surface-variant">close</span>
+              </button>
+            </div>
+            
+            <div className="p-8 space-y-8">
+              <div className="space-y-3 bg-surface-container-low p-5 rounded-2xl border border-outline-variant/20">
+                <label className="block text-sm font-bold text-on-surface uppercase tracking-widest flex items-center justify-between">
+                  <span>Seleção Rápida</span>
+                  <span className="text-primary font-black">{selectedUnits.length} selecionada(s)</span>
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  <button 
+                    onClick={handleSelectAll} 
+                    className={`px-4 py-2 transition-colors rounded-lg text-xs font-bold uppercase tracking-wider border ${selectedUnits.length === subUnits.length && subUnits.length > 0 ? 'bg-primary text-on-primary border-primary shadow-md' : 'bg-surface-container-high hover:bg-primary/10 hover:text-primary border-outline-variant/20'}`}
+                  >
+                    {selectedUnits.length === subUnits.length && subUnits.length > 0 ? "Desmarcar Todas" : "Todas as Unidades"}
+                  </button>
+                  {Array.from(new Set(subUnits.map(u => u.unit_type))).map(type => {
+                    const unitsOfType = subUnits.filter(u => u.unit_type === type);
+                    const isSelected = unitsOfType.length > 0 && unitsOfType.every(u => selectedUnits.includes(u.id));
+                    
+                    return (
+                      <button 
+                        key={type} 
+                        onClick={() => handleSelectByType(type)}
+                        className={`px-4 py-2 transition-colors rounded-lg text-xs font-bold uppercase tracking-wider border flex items-center gap-2 ${isSelected ? 'bg-primary text-on-primary border-primary shadow-md' : 'bg-surface-container-high hover:bg-primary/10 hover:text-primary border-outline-variant/20'}`}
+                      >
+                        {isSelected && <span className="material-symbols-outlined text-[14px]">check</span>}
+                        Todos os {['land', 'mixed', 'commercial_center', 'residential_center', 'dormitory', 'studio', 'commercial', 'house'].includes(type) ? t(`consultancy.types.${type}`) : 'Imóveis'}
+                      </button>
+                    );
+                  })}
+                  {selectedUnits.length > 0 && (
+                    <button onClick={() => setSelectedUnits([])} className="px-4 py-2 text-error hover:bg-error/10 transition-colors rounded-lg text-xs font-bold uppercase tracking-wider ml-auto">
+                      Limpar
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {selectedUnits.length === 0 ? (
+                <div className="text-center py-4 text-on-surface-variant">
+                  <span className="material-symbols-outlined text-4xl mb-4 opacity-50">check_box_outline_blank</span>
+                  <p>Selecione pelo menos uma unidade acima para aplicar reajustes.</p>
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  <div className="space-y-2">
+                    <label className="block text-sm font-bold text-on-surface uppercase tracking-widest">Reajuste CUB (%)</label>
+                    <input 
+                      type="number" 
+                      step="0.01" 
+                      value={bulkCubRate} 
+                      onChange={(e) => setBulkCubRate(Number(e.target.value))} 
+                      className="w-full bg-surface-container-high border border-outline-variant/30 rounded-xl p-4 text-on-surface focus:ring-2 focus:ring-primary/50 transition-all" 
+                      placeholder="Ex: 0.5 para mudar o CUB de todas" 
+                    />
+                    <p className="text-xs text-on-surface-variant">Isso irá substituir o CUB das unidades selecionadas. Deixe 0 para não alterar.</p>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="block text-sm font-bold text-on-surface uppercase tracking-widest">Aumento de Preço de Tabela (%)</label>
+                    <input 
+                      type="number" 
+                      step="0.01" 
+                      value={bulkPercent} 
+                      onChange={(e) => setBulkPercent(Number(e.target.value))} 
+                      className="w-full bg-surface-container-high border border-outline-variant/30 rounded-xl p-4 text-on-surface focus:ring-2 focus:ring-primary/50 transition-all" 
+                      placeholder="Ex: 5 para aumentar o preço em 5%" 
+                    />
+                    <p className="text-xs text-on-surface-variant">O preço inicial será recalculado adicionando +{bulkPercent || 0}% ao valor atual de cada unidade. Deixe 0 para não alterar.</p>
+                  </div>
+                </div>
+              )}
+            </div>
+            <div className="p-6 bg-surface-container-low border-t border-outline-variant/10 flex justify-end gap-4">
+              <Button variant="secondary" onClick={() => setIsBulkModalOpen(false)}>Cancelar</Button>
+              <Button disabled={selectedUnits.length === 0 || bulkProcessing} onClick={handleBulkUpdate}>
+                {bulkProcessing ? "Processando..." : "Aplicar Atualização"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {updateReport && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-300">
           <div className="bg-surface-container-lowest w-full max-w-4xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh] sunken-shadow border border-outline-variant/10">
@@ -953,6 +1423,178 @@ export const PropertyDetails = () => {
           </div>
         </div>
       )}
+
+      {isFloorPlanModalOpen && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-300">
+          <div className="bg-surface-container-lowest w-full max-w-4xl rounded-3xl shadow-2xl overflow-hidden flex flex-col sunken-shadow border border-outline-variant/10 min-h-[600px]">
+            <div className="p-8 border-b border-outline-variant/10 flex justify-between items-center bg-surface-container-low">
+              <div>
+                <h2 className="text-2xl font-headline font-bold text-on-surface flex items-center gap-3">
+                  <span className="material-symbols-outlined text-primary text-3xl">architecture</span>
+                  Laboratório de Plantas Baixas
+                </h2>
+                <p className="text-sm text-on-surface-variant font-body mt-2">
+                  Faça o upload do Caderno de Plantas. A Inteligência Artificial vai analisar, identificar os desenhos arquitetônicos e preparar tudo para você recortar e atribuir às unidades.
+                </p>
+              </div>
+              <button onClick={() => setIsFloorPlanModalOpen(false)} className="w-12 h-12 flex items-center justify-center rounded-full hover:bg-surface-container-high transition-colors bg-surface-container-lowest shadow-sm border border-outline-variant/10">
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+            
+            <div className="flex-1 p-8 flex flex-col items-center justify-center bg-surface-container-lowest relative overflow-hidden">
+              <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-primary/5 via-surface-container-lowest to-surface-container-lowest"></div>
+              
+              <div className="relative z-10 w-full max-w-xl text-center space-y-8">
+                {processingFloorPlanPdf && (
+                  <div className="bg-surface-container p-10 rounded-3xl shadow-xl border border-primary/20 flex flex-col items-center">
+                    <div className="relative w-32 h-32 mb-6">
+                      <div className="absolute inset-0 rounded-full border-4 border-surface-container-highest"></div>
+                      <div className="absolute inset-0 rounded-full border-4 border-primary border-t-transparent animate-spin"></div>
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <span className="material-symbols-outlined text-4xl text-primary animate-pulse">memory</span>
+                      </div>
+                    </div>
+                    <h3 className="text-xl font-bold text-on-surface mb-2">{extractionProgress.message}</h3>
+                    <p className="text-sm font-bold text-primary tracking-widest uppercase mb-6">
+                      Processando {extractionProgress.current} de {extractionProgress.total} páginas
+                    </p>
+                    <div className="w-full bg-surface-container-highest rounded-full h-3 overflow-hidden shadow-inner">
+                      <div 
+                        className="bg-primary h-full transition-all duration-500 ease-out"
+                        style={{ width: (extractionProgress.total > 0 ? (extractionProgress.current / extractionProgress.total) * 100 : 0) + '%' }}
+                      ></div>
+                    </div>
+                  </div>
+                )}
+                
+                {!processingFloorPlanPdf && floorPlansExtracted.length > 0 && (
+                  <div className="bg-surface-container p-8 rounded-3xl shadow-xl border border-primary/20 w-full max-w-4xl">
+                    <div className="flex items-center justify-between mb-6">
+                      <h3 className="text-xl font-bold text-on-surface">Plantas Encontradas ({floorPlansExtracted.length})</h3>
+                      <button onClick={() => setFloorPlansExtracted([])} className="text-sm font-bold text-on-surface-variant hover:text-primary transition-colors">Limpar / Novo PDF</button>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-h-[400px] overflow-y-auto pr-2">
+                      {floorPlansExtracted.map((plan, idx) => (
+                        <div key={idx} className="bg-surface-container-lowest border border-outline-variant/30 p-4 rounded-xl flex flex-col gap-3 group hover:border-primary/50 transition-colors">
+                          <div className="flex justify-between items-center border-b border-outline-variant/10 pb-2">
+                            <span className="text-xs font-black text-on-surface-variant uppercase tracking-wider">Página {plan.index}</span>
+                            <span className="material-symbols-outlined text-primary text-xl">architecture</span>
+                          </div>
+                          <h4 className="font-bold text-on-surface truncate" title={plan.name}>{plan.name}</h4>
+                          <button 
+                            onClick={() => setActivePlanToCrop(plan)}
+                            className="w-full py-2 bg-primary/10 text-primary font-bold rounded-lg uppercase tracking-wider text-xs hover:bg-primary hover:text-on-primary transition-colors mt-auto">
+                            Recortar Planta
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                
+                {!processingFloorPlanPdf && floorPlansExtracted.length === 0 && (
+                  <>
+                    <div className="w-32 h-32 mx-auto bg-surface-container-low rounded-3xl border-4 border-dashed border-primary/20 flex flex-col items-center justify-center text-primary/50 group-hover:border-primary/50 transition-colors animate-pulse shadow-inner">
+                      <span className="material-symbols-outlined text-5xl mb-2">upload_file</span>
+                      <span className="text-[10px] font-black uppercase tracking-widest">PDF AI</span>
+                    </div>
+                    
+                    <div>
+                      <h3 className="text-xl font-bold text-on-surface mb-2">Selecione o Caderno de Plantas</h3>
+                      <p className="text-on-surface-variant text-sm max-w-md mx-auto">
+                        Não importa se o PDF tem 100 páginas de imagens e marketing. A IA vai vasculhar página por página e extrair magicamente apenas os desenhos técnicos para você.
+                      </p>
+                    </div>
+                    
+                    <label className="inline-flex items-center gap-3 px-8 py-4 rounded-xl bg-primary text-on-primary font-bold uppercase tracking-widest cursor-pointer hover:opacity-90 transition-opacity shadow-lg shadow-primary/20">
+                      <span className="material-symbols-outlined">auto_awesome</span>
+                      Iniciar Extração Mágica
+                      <input type="file" className="hidden" accept=".pdf" onChange={handleFloorPlanPdfUpload} disabled={processingFloorPlanPdf} />
+                    </label>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activePlanToCrop && floorPlanPdfUrl && (
+        <div className="fixed inset-0 z-[300] bg-black/90">
+          <FloorPlanCropper
+            pdfUrl={floorPlanPdfUrl}
+            initialPage={activePlanToCrop.index}
+            onComplete={(images) => {
+               setCroppedImagesToAssociate({ name: activePlanToCrop.name, dataUrl: images[0] });
+               setActivePlanToCrop(null);
+            }}
+            onCancel={() => setActivePlanToCrop(null)}
+          />
+        </div>
+      )}
+
+      {croppedImagesToAssociate && (
+        <div className="fixed inset-0 z-[400] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-300">
+          <div className="bg-surface-container-lowest w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden flex flex-col sunken-shadow border border-outline-variant/10">
+            <div className="p-8 border-b border-outline-variant/10 flex justify-between items-center bg-surface-container-low">
+              <div>
+                <h2 className="text-2xl font-headline font-bold text-on-surface">Atribuir Planta</h2>
+                <p className="text-sm text-on-surface-variant font-body mt-2">
+                  Planta: <strong className="text-primary">{croppedImagesToAssociate.name}</strong>
+                </p>
+              </div>
+              <button onClick={() => setCroppedImagesToAssociate(null)} className="w-12 h-12 flex items-center justify-center rounded-full hover:bg-surface-container-high transition-colors shadow-sm border border-outline-variant/10">
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+            
+            <div className="p-8 max-h-[50vh] overflow-y-auto">
+              <div className="flex gap-4 mb-6">
+                <div className="w-1/3 bg-surface-container rounded-xl overflow-hidden shadow-inner flex items-center justify-center border border-outline-variant/10 p-2">
+                  <img src={croppedImagesToAssociate.dataUrl} alt="Preview" className="max-w-full max-h-32 object-contain rounded-lg" />
+                </div>
+                <div className="w-2/3">
+                  <h3 className="text-sm font-bold text-on-surface uppercase tracking-widest mb-4">Selecione as Unidades</h3>
+                  <div className="space-y-2">
+                    {subUnits.map(u => (
+                      <label key={u.id} className="flex items-center gap-3 p-3 rounded-lg border border-outline-variant/20 hover:bg-surface-container-low cursor-pointer transition-colors">
+                        <input 
+                          type="checkbox" 
+                          className="w-5 h-5 rounded border-outline-variant/50 text-primary focus:ring-primary bg-transparent"
+                          checked={associationSelectedUnits.includes(u.id)}
+                          onChange={(e) => {
+                             if (e.target.checked) setAssociationSelectedUnits([...associationSelectedUnits, u.id]);
+                             else setAssociationSelectedUnits(associationSelectedUnits.filter(id => id !== u.id));
+                          }}
+                        />
+                        <div className="flex flex-col">
+                          <span className="font-bold text-on-surface text-sm">{u.title}</span>
+                          <span className="text-[10px] uppercase text-on-surface-variant/60">{t(`status.${u.status}`)} • {u.unit_type}</span>
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <div className="p-6 bg-surface-container-low border-t border-outline-variant/10 flex justify-end gap-4">
+              <Button onClick={() => setCroppedImagesToAssociate(null)} variant="secondary">Cancelar</Button>
+              <Button onClick={handleAssociateImageToUnits} disabled={isAssociating || associationSelectedUnits.length === 0} className="flex items-center gap-2">
+                {isAssociating ? <span className="material-symbols-outlined animate-spin">sync</span> : <span className="material-symbols-outlined">save</span>}
+                {isAssociating ? 'Salvando...' : 'Salvar Associação'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <InvestmentSimulatorModal 
+        isOpen={isSimulatorOpen} 
+        onClose={() => setIsSimulatorOpen(false)} 
+        property={property} 
+      />
     </div>
   );
 };

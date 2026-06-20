@@ -120,20 +120,10 @@ export const RegisterBuilder = () => {
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 md:p-8">
-      <div className="w-full max-w-5xl bg-surface-container-low rounded-xl flex flex-col md:flex-row overflow-hidden sunken-shadow relative">
-        <div className="hidden md:flex md:w-1/3 bg-primary relative overflow-hidden flex-col justify-between p-10">
-          <div className="absolute inset-0 opacity-20">
-            <img src="https://lh3.googleusercontent.com/aida-public/AB6AXuARRebqbHieEmiIJRBFPnMXkkoEbkex5xyW5aVBcy5UewncPNXRsHBA3nSAoLzhQ-PSdsf8pHpuT2gjPSGWrID-ns_vQewv5g8h7mN7qrZd8FGI8HHJ15UKyjBOPBcnGMVpbrjU8W60zye5wOE9Pfllhm4Ra72A-D22fIJInkfMaqupqYeHHnLMqVUgo1of9DvbIh-jrINcvADGUAICPpzzgluR_cO6prPkTd8pZESeKPqN6wqBKAgCT9fSQJGhRaCx58OqHw042aWD" alt="Construction" className="w-full h-full object-cover" />
-          </div>
-          <div className="relative z-10">
-            <h2 className="font-headline text-3xl font-bold text-on-primary mb-4 tracking-tight">Partnering for the Future.</h2>
-            <p className="font-body text-primary-fixed-dim text-sm leading-relaxed">Join our network of premium construction partners. Complete your profile to access exclusive consultancy projects.</p>
-          </div>
-        </div>
-
-        <div className="w-full md:w-2/3 p-8 md:p-12 bg-surface">
-          <div className="mb-10">
-            <h1 className="font-headline text-2xl font-bold text-primary mb-2 tracking-tight">
+      <div className="w-full max-w-4xl bg-surface rounded-3xl overflow-hidden sunken-shadow border border-outline-variant/10">
+        <div className="w-full p-8 md:p-12">
+          <div className="mb-10 text-center">
+            <h1 className="font-headline text-3xl font-bold text-primary mb-2 tracking-tight">
               {isEditing ? t('builders.edit_title') : t('builders.register_title')}
             </h1>
             <p className="font-body text-on-surface-variant text-sm">

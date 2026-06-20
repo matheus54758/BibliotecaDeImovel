@@ -10,8 +10,11 @@ import { NewDevelopment } from './pages/NewDevelopment';
 import { Lands } from './pages/Lands';
 import { RegisterLand } from './pages/RegisterLand';
 import { Consultancy } from './pages/Consultancy';
+import { Clients } from './pages/Clients';
 import { ProtectedRoute } from './components/ProtectedRoute';
+import { LotAnalyzer } from './pages/LotAnalyzer';
 
+import { Branding } from './pages/Branding';
 import { Showcase } from './pages/Showcase';
 import { PropertyPublic } from './pages/PropertyPublic';
 
@@ -22,8 +25,8 @@ function App() {
         {/* Public Routes */}
         <Route path="/login" element={<Login />} />
         <Route path="/register-public" element={<RegisterBuilder />} />
-        <Route path="/vitrine/:userId" element={<Showcase />} />
         <Route path="/view/:id" element={<PropertyPublic />} />
+        <Route path="/:userId" element={<Showcase />} />
         
         {/* Protected Routes */}
         <Route element={<ProtectedRoute />}>
@@ -37,6 +40,7 @@ function App() {
             <Route path="/developments/new" element={<NewDevelopment />} />
             <Route path="/developments/:id" element={<PropertyDetails />} />
             <Route path="/developments/edit/:id" element={<NewDevelopment />} />
+            <Route path="/lot-analyzer" element={<LotAnalyzer />} />
             
             {/* New Distinct Routes */}
             <Route path="/projects/:id" element={<PropertyDetails />} />
@@ -51,8 +55,10 @@ function App() {
             <Route path="/builders/new" element={<RegisterBuilder />} />
             <Route path="/builders/edit/:id" element={<RegisterBuilder />} />
             <Route path="/consultancy" element={<Consultancy />} />
+            <Route path="/clients" element={<Clients />} />
             <Route path="/analytics" element={<div className="p-8">Analytics Page (Coming Soon)</div>} />
             <Route path="/settings" element={<div className="p-8">Settings Page (Coming Soon)</div>} />
+            <Route path="/settings/branding" element={<Branding />} />
           </Route>
         </Route>
 

@@ -8,6 +8,7 @@ import { Button } from "../components/Button";
 import { MediaUpload } from "../components/MediaUpload";
 import { InputField } from "../components/InputField";
 import { developmentSchema, type DevelopmentInput } from "../lib/schemas";
+import { cn } from '../lib/utils';
 
 export const NewDevelopment = () => {
   const { t } = useTranslation();
@@ -28,12 +29,27 @@ export const NewDevelopment = () => {
   const [ebooks, setEbooks] = useState<string[]>([]);
   const [parentId, setParentId] = useState<string | null>(parentIdFromUrl);
 
+  const [cropperConfig, setCropperConfig] = useState<{ isOpen: boolean, type: 'plans' | 'layouts', pdfUrl: string | null }>({
+    isOpen: false,
+    type: 'plans',
+    pdfUrl: null
+  });
+
+  const handleOpenCropper = (type: 'plans' | 'layouts') => {
+    if (ebooks.length === 0) {
+      alert("Por favor, faça o upload de um documento PDF primeiro na seção 'Documentos / E-books'.");
+      return;
+    }
+    setCropperConfig({ isOpen: true, type, pdfUrl: ebooks[0] });
+  };
+
   const {
     register,
     handleSubmit,
     setValue,
     watch,
     reset,
+    getValues,
     formState: { errors },
   } = useForm<DevelopmentInput>({
     resolver: zodResolver(developmentSchema) as any,
@@ -69,6 +85,24 @@ export const NewDevelopment = () => {
   });
 
   const heroImageUrl = watch("hero_image_url");
+  const priceStartingAt = watch("price_starting_at");
+
+  // Auto-calculate ROI based on price
+  useEffect(() => {
+    if (!priceStartingAt || priceStartingAt <= 0) return;
+    
+    // Only auto-fill if the fields are completely zero
+    const values = getValues();
+    
+    if (values.rent_annual === 0) setValue("rent_annual", parseFloat((priceStartingAt * 0.005).toFixed(2)), { shouldDirty: true });
+    if (values.rent_seasonal === 0) setValue("rent_seasonal", parseFloat((priceStartingAt * 0.01).toFixed(2)), { shouldDirty: true });
+    if (values.sale_value_after_keys === 0) setValue("sale_value_after_keys", parseFloat((priceStartingAt * 1.40).toFixed(2)), { shouldDirty: true });
+    if (values.roi_appreciation_1y === 0) setValue("roi_appreciation_1y", 15, { shouldDirty: true });
+    if (values.roi_appreciation_2y === 0) setValue("roi_appreciation_2y", 12, { shouldDirty: true });
+    if (values.roi_appreciation_3y === 0) setValue("roi_appreciation_3y", 10, { shouldDirty: true });
+    if (values.cub_monthly_rate === 0) setValue("cub_monthly_rate", 0.5, { shouldDirty: true });
+
+  }, [priceStartingAt, setValue, getValues]);
 
   useEffect(() => {
     async function fetchData() {
@@ -111,6 +145,14 @@ export const NewDevelopment = () => {
           floor_plan_url: [],
           floor_layout_url: [],
           ebook_url: [],
+          cub_monthly_rate: 0,
+          months_until_keys: 0,
+          sale_value_after_keys: 0,
+          rent_seasonal: 0,
+          rent_annual: 0,
+          roi_appreciation_1y: 0,
+          roi_appreciation_2y: 0,
+          roi_appreciation_3y: 0,
         });
       }
 
@@ -282,7 +324,15 @@ export const NewDevelopment = () => {
         is_pet_friendly: !!data.is_pet_friendly,
         has_complete_leisure: !!data.has_complete_leisure,
         has_automation: !!data.has_automation,
-        parent_id: parentId // Hierarchy integrity
+        parent_id: parentId, // Hierarchy integrity
+        cub_monthly_rate: data.cub_monthly_rate || 0,
+        months_until_keys: data.months_until_keys || 0,
+        sale_value_after_keys: data.sale_value_after_keys || 0,
+        rent_seasonal: data.rent_seasonal || 0,
+        rent_annual: data.rent_annual || 0,
+        roi_appreciation_1y: data.roi_appreciation_1y || 0,
+        roi_appreciation_2y: data.roi_appreciation_2y || 0,
+        roi_appreciation_3y: data.roi_appreciation_3y || 0,
       };
 
       if (isEditing) {
@@ -584,6 +634,43 @@ export const NewDevelopment = () => {
           </div>
         )}
 
+        {(parentId || isStandaloneProperty) && (
+          <div className="bg-surface-container-lowest rounded-xl p-8 sunken-shadow space-y-8">
+            <h3 className="font-headline text-xl font-bold text-primary border-b border-surface-container-high pb-4 flex items-center gap-2">
+              <span className="material-symbols-outlined">trending_up</span>
+              Projeções de Investimento e Retorno (ROI)
+            </h3>
+            
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="space-y-4">
+                <h4 className="font-bold text-primary flex items-center gap-2 text-sm uppercase tracking-wider">
+                  Valorização (Projeção)
+                </h4>
+                <InputField label="Em 1 Ano (%)" type="number" step="0.01" {...register("roi_appreciation_1y")} placeholder="Ex: 15" />
+                <InputField label="Em 2 Anos (%)" type="number" step="0.01" {...register("roi_appreciation_2y")} placeholder="Ex: 30" />
+                <InputField label="Em 3 Anos (%)" type="number" step="0.01" {...register("roi_appreciation_3y")} placeholder="Ex: 45" />
+              </div>
+
+              <div className="space-y-4">
+                <h4 className="font-bold text-primary flex items-center gap-2 text-sm uppercase tracking-wider">
+                  Rentabilidade e Venda
+                </h4>
+                <InputField label="Rend. Temporada (R$/mês)" type="number" step="0.01" {...register("rent_seasonal")} />
+                <InputField label="Rend. Anual (R$/mês)" type="number" step="0.01" {...register("rent_annual")} />
+                <InputField label="Valor de Venda (Pós-Chaves) (R$)" type="number" step="0.01" {...register("sale_value_after_keys")} />
+              </div>
+
+              <div className="space-y-4">
+                <h4 className="font-bold text-primary flex items-center gap-2 text-sm uppercase tracking-wider">
+                  Correção e Entrega
+                </h4>
+                <InputField label="Reajuste CUB Mensal (%)" type="number" step="0.01" {...register("cub_monthly_rate")} placeholder="Ex: 0.5" />
+                <InputField label="Meses até Entrega da Chave" type="number" {...register("months_until_keys")} placeholder="Ex: 24" />
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="bg-surface-container-lowest rounded-xl p-8 sunken-shadow space-y-8">
           <h3 className="font-headline text-xl font-bold text-primary border-b border-surface-container-high pb-4">
             {isStandaloneProperty ? "Galeria e Mídias do Imóvel" : "Materiais do Empreendimento"}
@@ -606,22 +693,26 @@ export const NewDevelopment = () => {
               onUpload={(urls) => setEbooks(urls as string[])}
             />
 
-            <MediaUpload 
-              label={isStandaloneProperty ? "Imagens do Imóvel (Fotos)" : "Plantas Baixas"}
-              accept="image"
-              multiple
-              previewUrl={floorPlans}
-              onUpload={(urls) => setFloorPlans(urls as string[])}
-            />
-
-            {!isStandaloneProperty && (
+            <div className="space-y-4">
               <MediaUpload 
-                label="Layouts / Pavimentos"
+                label={isStandaloneProperty ? "Imagens do Imóvel (Fotos)" : "Plantas Baixas"}
                 accept="image"
                 multiple
-                previewUrl={floorLayouts}
-                onUpload={(urls) => setFloorLayouts(urls as string[])}
+                previewUrl={floorPlans}
+                onUpload={(urls) => setFloorPlans(urls as string[])}
               />
+            </div>
+
+            {!isStandaloneProperty && (
+              <div className="space-y-4">
+                <MediaUpload 
+                  label="Layouts / Pavimentos"
+                  accept="image"
+                  multiple
+                  previewUrl={floorLayouts}
+                  onUpload={(urls) => setFloorLayouts(urls as string[])}
+                />
+              </div>
             )}
           </div>
         </div>

@@ -2,7 +2,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { formatCurrency, formatNumber } from './utils';
 
-export const generatePropertyPDF = async (property: any, amenities: any[], gallery: any[], subUnits: any[] = []) => {
+export const generatePropertyPDF = async (property: any, amenities: any[], gallery: any[], subUnits: any[] = [], theme: any = null) => {
   console.log("Iniciando geração de PDF para:", property.title);
   
   const loadingDiv = document.createElement('div');
@@ -17,7 +17,16 @@ export const generatePropertyPDF = async (property: any, amenities: any[], galle
       format: 'a4',
     });
 
-    const gold: [number, number, number] = [212, 175, 55]; 
+    const hexToRgb = (hex: string): [number, number, number] => {
+      const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+      return result ? [
+        parseInt(result[1], 16),
+        parseInt(result[2], 16),
+        parseInt(result[3], 16)
+      ] : [212, 175, 55];
+    };
+
+    const gold: [number, number, number] = theme?.primary_color ? hexToRgb(theme.primary_color) : [212, 175, 55]; 
     const black: [number, number, number] = [0, 0, 0];
     const isProject = property.parent_id === null && property.builder_id !== null;
 
@@ -46,7 +55,7 @@ export const generatePropertyPDF = async (property: any, amenities: any[], galle
     doc.setTextColor(gold[0], gold[1], gold[2]);
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(22);
-    doc.text("Lumis - Inteligência Imobiliária", 15, 20);
+    doc.text(theme?.company_name || "Lumis - Inteligência Imobiliária", 15, 20);
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
@@ -126,11 +135,6 @@ export const generatePropertyPDF = async (property: any, amenities: any[], galle
 
       // Payment Plan Section for sub-units/standalone properties
       if (property.price_starting_at > 0) {
-        doc.setTextColor(black[0], black[1], black[2]);
-        doc.setFontSize(14);
-        doc.setFont('helvetica', 'bold');
-        doc.text("Plano de Pagamento", 15, currentYAfterHeader + 10);
-        
         const paymentData = [];
         if (property.payment_entry > 0) paymentData.push(['Entrada', formatCurrency(property.payment_entry)]);
         if (property.payment_installment_count > 0) paymentData.push([`${property.payment_installment_count}x Mensais`, formatCurrency(property.payment_installment_value)]);
@@ -138,6 +142,11 @@ export const generatePropertyPDF = async (property: any, amenities: any[], galle
         if (property.payment_post_construction > 0) paymentData.push(['Saldo Pós-Obra', formatCurrency(property.payment_post_construction)]);
         
         if (paymentData.length > 0) {
+          doc.setTextColor(black[0], black[1], black[2]);
+          doc.setFontSize(14);
+          doc.setFont('helvetica', 'bold');
+          doc.text("Plano de Pagamento", 15, currentYAfterHeader + 10);
+
           autoTable(doc, {
             startY: currentYAfterHeader + 15,
             margin: { left: 15, right: 15 },
@@ -150,6 +159,66 @@ export const generatePropertyPDF = async (property: any, amenities: any[], galle
         }
       }
     }
+
+      // Investment / ROI Projections
+      if (property.roi_appreciation_1y > 0 || property.rent_annual > 0 || property.rent_seasonal > 0 || property.sale_value_after_keys > 0 || property.cub_monthly_rate > 0) {
+        if (currentYAfterHeader > 220) {
+           doc.addPage();
+           currentYAfterHeader = 20;
+        } else {
+           currentYAfterHeader += 10;
+        }
+
+        const emDark: [number, number, number] = [6, 78, 59]; // Emerald 900
+        const emLight: [number, number, number] = [236, 253, 245]; // Emerald 50
+
+        // Banner Premium ROI
+        doc.setFillColor(emDark[0], emDark[1], emDark[2]);
+        doc.rect(15, currentYAfterHeader, 180, 12, 'F');
+        
+        doc.setTextColor(gold[0], gold[1], gold[2]);
+        doc.setFontSize(14);
+        doc.setFont('helvetica', 'bold');
+        doc.text("POTENCIAL DE INVESTIMENTO E RENTABILIDADE", 20, currentYAfterHeader + 8);
+
+        currentYAfterHeader += 12;
+        
+        const roiData = [];
+        
+        if (property.roi_appreciation_1y > 0) roiData.push(['Valorização em 12 Meses', `+${property.roi_appreciation_1y}%`]);
+        if (property.roi_appreciation_2y > 0) roiData.push(['Valorização em 24 Meses', `+${property.roi_appreciation_2y}%`]);
+        if (property.roi_appreciation_3y > 0) roiData.push(['Valorização em 36 Meses', `+${property.roi_appreciation_3y}%`]);
+        
+        if (property.rent_seasonal > 0) roiData.push(['Renda Passiva: Temporada (mês)', formatCurrency(property.rent_seasonal)]);
+        if (property.rent_annual > 0) roiData.push(['Renda Passiva: Anual (mês)', formatCurrency(property.rent_annual)]);
+        
+        if (property.sale_value_after_keys > 0) roiData.push(['Projeção de Venda nas Chaves', formatCurrency(property.sale_value_after_keys)]);
+        if (property.cub_monthly_rate > 0) roiData.push(['Reajuste CUB Estimado (a.m.)', `+${property.cub_monthly_rate}%`]);
+        if (property.months_until_keys > 0) roiData.push(['Prazo Estimado para Chaves', `${property.months_until_keys} meses`]);
+
+        if (roiData.length > 0) {
+           autoTable(doc, {
+             startY: currentYAfterHeader,
+             margin: { left: 15, right: 15 },
+             body: roiData,
+             theme: 'grid',
+             styles: { fontSize: 11, cellPadding: 4, textColor: [30, 30, 30], lineColor: [200, 200, 200], lineWidth: 0.1 },
+             columnStyles: { 
+                0: { fontStyle: 'bold', cellWidth: 100, fillColor: emLight, textColor: emDark }, 
+                1: { fontStyle: 'bold', textColor: emDark, halign: 'right' } 
+             }
+           });
+           currentYAfterHeader = (doc as any).lastAutoTable.finalY + 5;
+           
+           // Disclaimer text
+           doc.setFontSize(8);
+           doc.setFont('helvetica', 'normal');
+           doc.setTextColor(150, 150, 150);
+           doc.text("* Projeções baseadas no histórico de mercado. Não garantem rentabilidade futura e sofrem variações.", 15, currentYAfterHeader);
+           currentYAfterHeader += 5;
+        }
+      }
+
 
     // Description (Multi-page)
     let finalY = currentYAfterHeader + 10;

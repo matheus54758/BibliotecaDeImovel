@@ -5,11 +5,13 @@ import { supabase } from "../lib/supabase";
 import { Button } from "../components/Button";
 import { formatCurrency, formatNumber } from "../lib/utils";
 import { generatePropertyPDF } from "../lib/pdf";
+import { useTheme } from "../hooks/useTheme";
 
 export const PropertyPublic = () => {
   const { t } = useTranslation();
   const { id } = useParams();
   const navigate = useNavigate();
+  const { theme } = useTheme();
   const [property, setProperty] = useState<any>(null);
   const [amenities, setAmenities] = useState<any[]>([]);
   const [gallery, setGallery] = useState<any[]>([]);
@@ -233,8 +235,8 @@ export const PropertyPublic = () => {
                 </Button>
                 
                 <button 
-                  onClick={() => generatePropertyPDF(property, amenities, gallery, [])}
-                  className="w-full py-4 border-2 border-primary text-primary hover:bg-primary hover:text-on-primary transition-all rounded-2xl font-bold flex items-center justify-center gap-2 uppercase tracking-widest text-sm"
+                  onClick={() => generatePropertyPDF(property, amenities, gallery, [], theme)}
+                  className="w-full px-6 py-4 bg-primary text-on-primary rounded-xl font-bold flex items-center justify-center gap-2 hover:opacity-90 transition-opacity"
                 >
                   <span className="material-symbols-outlined">download</span>
                   Baixar Apresentação PDF

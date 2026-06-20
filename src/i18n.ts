@@ -15,8 +15,9 @@ const resources = {
         "project_developments": "Projects",
         "developments": "Properties",
         "lands": "Lands",
-        "construction": "Builders",
-        "consultancy": "Consultancy",
+        "construction": "Construtoras",
+        "consultancy": "Consultoria",
+        "clients": "Clientes",
         "analytics": "Analytics",
         "settings": "Settings",
         "library": "Property Library",
@@ -108,6 +109,9 @@ const resources = {
         "active": "Active",
         "inactive": "Inactive",
         "company_name": "Legal Company Name",
+        "form": {
+          "logo": "Builder Image"
+        },
         "tax_id": "CNPJ / Tax ID",
         "specialization_label": "Specialization",
         "email": "Corporate Email",
@@ -209,6 +213,25 @@ const resources = {
         "builder_limit_desc": "Free users can only add up to 2 builders. Upgrade to a Pro plan for unlimited access.",
         "development_limit_desc": "Free users can only add up to 5 properties. Upgrade to a Pro plan for unlimited access.",
         "upgrade_now": "Upgrade Now"
+      },
+      "clients": {
+        "title": "Client Management",
+        "subtitle": "Track presentations and client interests in real-time.",
+        "add_new": "Add Interaction",
+        "name": "Client Name",
+        "phone": "Phone Number",
+        "email": "Email",
+        "property": "Presented Property",
+        "interest": "Interest Level",
+        "notes": "Interaction Notes",
+        "date": "Interaction Date",
+        "no_clients": "No client interactions registered.",
+        "levels": {
+          "low": "Low Interest",
+          "medium": "Medium Interest",
+          "high": "High Interest",
+          "very_high": "Very High / Closing"
+        }
       }
     }
   },
@@ -319,6 +342,9 @@ const resources = {
         "active": "Ativo",
         "inactive": "Inativo",
         "company_name": "Nome Jurídico da Empresa",
+        "form": {
+          "logo": "Imagem da Construtora"
+        },
         "tax_id": "CNPJ / ID Fiscal",
         "specialization_label": "Especialização",
         "email": "E-mail Corporativo",
@@ -420,6 +446,25 @@ const resources = {
         "builder_limit_desc": "Usuários gratuitos podem adicionar até 2 construtoras. Faça upgrade para o plano Pro para acesso ilimitado.",
         "development_limit_desc": "Usuários gratuitos podem adicionar até 5 imóveis. Faça upgrade para o plano Pro para acesso ilimitado.",
         "upgrade_now": "Fazer Upgrade Agora"
+      },
+      "clients": {
+        "title": "Gestão de Clientes",
+        "subtitle": "Acompanhe apresentações e o interesse dos clientes em tempo real.",
+        "add_new": "Registrar Atendimento",
+        "name": "Nome do Cliente",
+        "phone": "Telefone",
+        "email": "E-mail",
+        "property": "Imóvel Apresentado",
+        "interest": "Nível de Interesse",
+        "notes": "Notas do Atendimento",
+        "date": "Data do Contato",
+        "no_clients": "Nenhum atendimento registrado.",
+        "levels": {
+          "low": "Baixo Interesse",
+          "medium": "Médio Interesse",
+          "high": "Alto Interesse",
+          "very_high": "Altíssimo / Fechamento"
+        }
       }
     }
   },

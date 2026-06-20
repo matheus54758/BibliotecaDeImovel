@@ -13,6 +13,9 @@ export const SideNavBar = () => {
     { name: t('nav.lands'), icon: 'landscape', path: '/lands' },
     { name: t('nav.construction'), icon: 'engineering', path: '/builders' },
     { name: t('nav.consultancy'), icon: 'business_center', path: '/consultancy' },
+    { name: t('nav.clients'), icon: 'person_search', path: '/clients' },
+    { name: 'Viabilidade (IPTU)', icon: 'explore', path: '/lot-analyzer' },
+    { name: 'Personalização', icon: 'palette', path: '/settings/branding' },
   ];
 
   const isPathActive = (path: string) => {

@@ -15,8 +15,8 @@
   --color-on-error: #ffffff;
   --color-inverse-on-surface: #000000;
   --color-background: #000000;
-  --color-on-primary-container: #D4AF37;
-  --color-on-primary-fixed-variant: #B8860B;
+  --color-on-primary-container: var(--color-primary);
+  --color-on-primary-fixed-variant: var(--color-primary-container);
   --color-tertiary-fixed-dim: #4edea3;
   --color-tertiary-fixed: #6ffbbe;
   --color-error-container: #93000a;
@@ -24,10 +24,14 @@
   --color-secondary-fixed-dim: #2a2a2a;
   --color-outline-variant: #3a3a3a;
   --color-inverse-surface: #F5F5F5;
-  --color-primary-fixed: #D4AF37;
+  --color-primary-fixed: var(--color-primary);
   --color-tertiary: #003c27;
   --color-on-secondary: #000000;
+  
+  /* Variáveis Dinâmicas */
   --color-primary: #D4AF37;
+  --color-primary-container: #B8860B;
+  
   --color-on-background: #FFFFFF;
   --color-error: #ba1a1a;
   --color-surface-container: #1e1e1e;
@@ -36,14 +40,14 @@
   --color-inverse-primary: #000000;
   --color-on-tertiary: #ffffff;
   --color-primary-container: #B8860B;
-  --color-surface-tint: #D4AF37;
+  --color-surface-tint: var(--color-primary);
   --color-surface-bright: #1a1a1a;
   --color-on-secondary-fixed-variant: #D4AF37;
   --color-surface: #121212;
   --color-on-primary: #000000;
-  --color-primary-fixed-dim: #B8860B;
+  --color-primary-fixed-dim: var(--color-primary-container);
   --color-on-tertiary-fixed: #002113;
-  --color-secondary-fixed: #D4AF37;
+  --color-secondary-fixed: var(--color-primary);
   --color-surface-container-highest: #333333;
   --color-outline: #4a4a4a;
   --color-surface-variant: #1e1e1e;

@@ -53,6 +53,14 @@ export const developmentSchema = z.object({
   payment_reinforcement_count: z.coerce.number().nonnegative().nullable().default(0),
   payment_post_construction: z.coerce.number().nonnegative().nullable().default(0),
   parent_id: z.string().uuid().nullable().optional(),
+  cub_monthly_rate: z.coerce.number().nullable().default(0),
+  months_until_keys: z.coerce.number().nonnegative().nullable().default(0),
+  sale_value_after_keys: z.coerce.number().nonnegative().nullable().default(0),
+  rent_seasonal: z.coerce.number().nonnegative().nullable().default(0),
+  rent_annual: z.coerce.number().nonnegative().nullable().default(0),
+  roi_appreciation_1y: z.coerce.number().nullable().default(0),
+  roi_appreciation_2y: z.coerce.number().nullable().default(0),
+  roi_appreciation_3y: z.coerce.number().nullable().default(0),
 });
 
 export type LoginInput = z.infer<typeof loginSchema>;

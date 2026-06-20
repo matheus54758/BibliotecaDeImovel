@@ -6,10 +6,12 @@ import { formatCurrency } from "../lib/utils";
 
 export const Showcase = () => {
   const { t } = useTranslation();
-  const { userId } = useParams();
+  const { userId: identifier } = useParams();
   const [properties, setProperties] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [ownerTier, setOwnerTier] = useState<'free' | 'paid'>('free');
+  const [ownerTheme, setOwnerTheme] = useState<any>(null);
+  const [ownerId, setOwnerId] = useState<string | null>(null);
   
   // Filters
   const [maxPrice, setMaxPrice] = useState<string>("");
@@ -52,30 +54,50 @@ export const Showcase = () => {
 
   useEffect(() => {
     async function fetchOwnerInfo() {
-      if (!userId) return;
+      if (!identifier) return;
       try {
-        const { data } = await supabase.from('public_profiles').select('*').eq('id', userId).maybeSingle();
+        let query = supabase.from('profiles').select('*');
+        
+        // Detect if identifier is UUID or slug
+        if (identifier.length === 36 && identifier.includes('-')) {
+          query = query.eq('id', identifier);
+        } else {
+          query = query.eq('slug', identifier);
+        }
+
+        const { data } = await query.maybeSingle();
+
         if (data) {
-          // Branding/tier info could go here
+          setOwnerId(data.id);
+          setOwnerTheme(data.theme_config);
+          if (data.theme_config?.primary_color) {
+            document.documentElement.style.setProperty('--color-primary', data.theme_config.primary_color);
+            document.documentElement.style.setProperty('--color-primary-container', data.theme_config.primary_color);
+          }
         }
       } catch (err) {
         console.error("Error fetching owner info:", err);
       }
     }
     fetchOwnerInfo();
-    fetchShowcaseProperties();
-  }, [userId, selectedTags, maxPrice, minSqFt, selectedType, selectedDevType, selectedStatus, searchCity, searchState, searchStreet]);
+  }, [identifier]);
+
+  useEffect(() => {
+    if (ownerId) {
+      fetchShowcaseProperties();
+    }
+  }, [ownerId, selectedTags, maxPrice, minSqFt, selectedType, selectedDevType, selectedStatus, searchCity, searchState, searchStreet]);
 
   async function fetchShowcaseProperties() {
-    if (!userId) return;
+    if (!ownerId) return;
     setLoading(true);
     try {
       setOwnerTier('free'); 
 
       let query = supabase
         .from('developments')
-        .select('*')
-        .eq('user_id', userId)
+        .select('*, parent:parent_id(title)')
+        .eq('user_id', ownerId)
         .order('created_at', { ascending: false });
 
       if (selectedType) query = query.eq('unit_type', selectedType);
@@ -106,238 +128,280 @@ export const Showcase = () => {
   };
 
   return (
-    <div className="max-w-7xl mx-auto py-12 px-4">
-      <header className="mb-12 text-center">
-        <h1 className="text-4xl font-headline font-bold text-on-surface mb-4 tracking-tight">Vitrine de Imóveis</h1>
-        <p className="text-on-surface-variant font-body text-lg max-w-2xl mx-auto">Explore as melhores oportunidades selecionadas para você. Use os filtros abaixo para encontrar o imóvel ideal.</p>
-      </header>
+    <div className="min-h-screen bg-background pb-20">
+      {/* Banner / Header Area */}
+      {ownerTheme?.banner_url ? (
+        <div className="w-full h-[300px] md:h-[450px] relative overflow-hidden">
+          <img src={ownerTheme.banner_url} alt="Banner" className="w-full h-full object-cover" />
+          <div className="absolute inset-0 bg-gradient-to-t from-background via-transparent to-transparent" />
+          <div className="absolute bottom-10 left-4 md:left-12 max-w-7xl mx-auto w-full px-4">
+            <h1 className="text-4xl md:text-6xl font-headline font-black text-white tracking-tight drop-shadow-2xl">
+              {ownerTheme.company_name || "Vitrine de Imóveis"}
+            </h1>
+            <p className="text-primary font-bold uppercase tracking-[0.3em] mt-2 drop-shadow-lg">{t('nav.consultant_pro')}</p>
+          </div>
+        </div>
+      ) : (
+        <header className="max-w-7xl mx-auto pt-16 pb-8 px-4 text-center">
+          <h1 className="text-4xl md:text-6xl font-headline font-black text-on-surface mb-4 tracking-tighter">
+            {ownerTheme?.company_name || "Vitrine de Imóveis"}
+          </h1>
+          <p className="text-primary font-bold uppercase tracking-[0.3em] text-xs mb-8">{t('nav.consultant_pro')}</p>
+          <p className="text-on-surface-variant font-body text-lg max-w-2xl mx-auto">Explore as melhores oportunidades selecionadas para você. Use os filtros abaixo para encontrar o imóvel ideal.</p>
+        </header>
+      )}
 
-      <section className="bg-surface-container-lowest p-6 rounded-3xl sunken-shadow mb-12 space-y-8 border border-outline-variant/10">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-6 items-end">
-          <div className="lg:col-span-2 space-y-2">
-            <label className="text-xs font-black uppercase tracking-widest text-on-surface-variant">Preço Máximo</label>
-            <input 
-              type="number" 
-              value={maxPrice} 
-              onChange={(e) => setMaxPrice(e.target.value)}
-              placeholder="Ex: 500.000"
-              className="w-full bg-surface-container-high border-0 rounded-xl py-3 px-4 text-on-surface"
-            />
+      <div className="max-w-7xl mx-auto px-4 mt-8">
+        {/* About Me Section */}
+        {ownerTheme?.about_me && (
+          <section className="mb-16 bg-surface-container-lowest p-8 md:p-12 rounded-[2rem] sunken-shadow border border-outline-variant/10 relative overflow-hidden group">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-bl-full -mr-16 -mt-16 transition-transform group-hover:scale-110" />
+            <div className="relative z-10">
+              <h2 className="text-sm font-black uppercase tracking-[0.3em] text-primary mb-6 flex items-center gap-2">
+                <span className="w-8 h-[2px] bg-primary"></span>
+                Sobre Mim
+              </h2>
+              <div className="prose prose-invert max-w-none">
+                <p className="text-xl md:text-2xl font-body text-on-surface/80 leading-relaxed italic">
+                  "{ownerTheme.about_me}"
+                </p>
+              </div>
+            </div>
+          </section>
+        )}
+
+        <section className="bg-surface-container-lowest p-6 rounded-3xl sunken-shadow mb-12 space-y-8 border border-outline-variant/10">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-6 items-end">
+            <div className="lg:col-span-2 space-y-2">
+              <label className="text-xs font-black uppercase tracking-widest text-on-surface-variant">Preço Máximo</label>
+              <input 
+                type="number" 
+                value={maxPrice} 
+                onChange={(e) => setMaxPrice(e.target.value)}
+                placeholder="Ex: 500.000"
+                className="w-full bg-surface-container-high border-0 rounded-xl py-3 px-4 text-on-surface"
+              />
+            </div>
+            <div className="lg:col-span-2 space-y-2">
+              <label className="text-xs font-black uppercase tracking-widest text-on-surface-variant">Área Mín. (m²)</label>
+              <input 
+                type="number" 
+                value={minSqFt} 
+                onChange={(e) => setMinSqFt(e.target.value)}
+                placeholder="Ex: 100"
+                className="w-full bg-surface-container-high border-0 rounded-xl py-3 px-4 text-on-surface"
+              />
+            </div>
+            <div className="lg:col-span-1 space-y-2">
+              <label className="text-xs font-black uppercase tracking-widest text-on-surface-variant">UF</label>
+              <input 
+                type="text" 
+                value={searchState} 
+                onChange={(e) => setSearchState(e.target.value)}
+                placeholder="SC"
+                className="w-full bg-surface-container-high border-0 rounded-xl py-3 px-4 text-on-surface"
+              />
+            </div>
+            <div className="lg:col-span-3 space-y-2">
+              <label className="text-xs font-black uppercase tracking-widest text-on-surface-variant">Cidade</label>
+              <input 
+                type="text" 
+                value={searchCity} 
+                onChange={(e) => setSearchCity(e.target.value)}
+                placeholder="Qualquer cidade"
+                className="w-full bg-surface-container-high border-0 rounded-xl py-3 px-4 text-on-surface"
+              />
+            </div>
+            <div className="lg:col-span-4 space-y-2">
+              <label className="text-xs font-black uppercase tracking-widest text-on-surface-variant">Status</label>
+              <div className="flex flex-wrap gap-2">
+                {[
+                  { id: 'available', label: 'Disponível', color: 'bg-emerald-500' },
+                  { id: 'reserved', label: 'Reservado', color: 'bg-amber-500' },
+                  { id: 'sold', label: 'Vendido', color: 'bg-red-500' },
+                ].map((status) => (
+                  <button
+                    key={status.id}
+                    onClick={() => setSelectedStatus(prev => prev === status.id ? "" : status.id)}
+                    className={`px-4 py-2 rounded-full text-xs font-bold border-2 transition-all ${
+                      selectedStatus === status.id
+                        ? `border-transparent text-white shadow-lg ${status.color}`
+                        : 'bg-surface-container-high border-transparent text-on-surface-variant hover:border-outline-variant'
+                    }`}
+                  >
+                    {status.label}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
-          <div className="lg:col-span-2 space-y-2">
-            <label className="text-xs font-black uppercase tracking-widest text-on-surface-variant">Área Mín. (m²)</label>
-            <input 
-              type="number" 
-              value={minSqFt} 
-              onChange={(e) => setMinSqFt(e.target.value)}
-              placeholder="Ex: 100"
-              className="w-full bg-surface-container-high border-0 rounded-xl py-3 px-4 text-on-surface"
-            />
-          </div>
-          <div className="lg:col-span-1 space-y-2">
-            <label className="text-xs font-black uppercase tracking-widest text-on-surface-variant">UF</label>
+
+          <div className="space-y-2 pt-4 border-t border-outline-variant/10">
+            <label className="text-xs font-black uppercase tracking-widest text-on-surface-variant">Rua / Bairro</label>
             <input 
               type="text" 
-              value={searchState} 
-              onChange={(e) => setSearchState(e.target.value)}
-              placeholder="SC"
+              value={searchStreet} 
+              onChange={(e) => setSearchStreet(e.target.value)}
+              placeholder="Ex: Rua das Flores"
               className="w-full bg-surface-container-high border-0 rounded-xl py-3 px-4 text-on-surface"
             />
           </div>
-          <div className="lg:col-span-3 space-y-2">
-            <label className="text-xs font-black uppercase tracking-widest text-on-surface-variant">Cidade</label>
-            <input 
-              type="text" 
-              value={searchCity} 
-              onChange={(e) => setSearchCity(e.target.value)}
-              placeholder="Qualquer cidade"
-              className="w-full bg-surface-container-high border-0 rounded-xl py-3 px-4 text-on-surface"
-            />
-          </div>
-          <div className="lg:col-span-4 space-y-2">
-            <label className="text-xs font-black uppercase tracking-widest text-on-surface-variant">Status</label>
-            <div className="flex flex-wrap gap-2">
-              {[
-                { id: 'available', label: 'Disponível', color: 'bg-emerald-500' },
-                { id: 'reserved', label: 'Reservado', color: 'bg-amber-500' },
-                { id: 'sold', label: 'Vendido', color: 'bg-red-500' },
-              ].map((status) => (
-                <button
-                  key={status.id}
-                  onClick={() => setSelectedStatus(prev => prev === status.id ? "" : status.id)}
-                  className={`px-4 py-2 rounded-full text-xs font-bold border-2 transition-all ${
-                    selectedStatus === status.id
-                      ? `border-transparent text-white shadow-lg ${status.color}`
-                      : 'bg-surface-container-high border-transparent text-on-surface-variant hover:border-outline-variant'
-                  }`}
-                >
-                  {status.label}
-                </button>
-              ))}
+
+          <div className="space-y-4 pt-4 border-t border-outline-variant/10">
+            <div className="space-y-2">
+              <label className="text-xs font-black uppercase tracking-widest text-on-surface-variant">Tipo de Unidade / Imóvel</label>
+              <div className="flex flex-wrap gap-2">
+                {propertyTypes.map(t => (
+                  <button 
+                    key={t.id} 
+                    onClick={() => {
+                      setSelectedType(prev => prev === t.id ? "" : t.id);
+                      setSelectedDevType("");
+                    }}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold border-2 transition-all ${selectedType === t.id ? 'bg-primary border-primary text-on-primary shadow-lg shadow-primary/20' : 'bg-surface-container-high border-transparent text-on-surface-variant'}`}
+                  >
+                    <span className="material-symbols-outlined text-sm">{t.icon}</span>
+                    {t.label}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
-        </div>
 
-        <div className="space-y-2 pt-4 border-t border-outline-variant/10">
-          <label className="text-xs font-black uppercase tracking-widest text-on-surface-variant">Rua / Bairro</label>
-          <input 
-            type="text" 
-            value={searchStreet} 
-            onChange={(e) => setSearchStreet(e.target.value)}
-            placeholder="Ex: Rua das Flores"
-            className="w-full bg-surface-container-high border-0 rounded-xl py-3 px-4 text-on-surface"
-          />
-        </div>
-
-        <div className="space-y-4 pt-4 border-t border-outline-variant/10">
-          <div className="space-y-2">
-            <label className="text-xs font-black uppercase tracking-widest text-on-surface-variant">Tipo de Unidade / Imóvel</label>
-            <div className="flex flex-wrap gap-2">
-              {propertyTypes.map(t => (
-                <button 
-                  key={t.id} 
-                  onClick={() => {
-                    setSelectedType(prev => prev === t.id ? "" : t.id);
-                    setSelectedDevType("");
-                  }}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold border-2 transition-all ${selectedType === t.id ? 'bg-primary border-primary text-on-primary shadow-lg shadow-primary/20' : 'bg-surface-container-high border-transparent text-on-surface-variant'}`}
-                >
-                  <span className="material-symbols-outlined text-sm">{t.icon}</span>
-                  {t.label}
-                </button>
-              ))}
+          <div className="space-y-4 pt-4 border-t border-outline-variant/10">
+            <div className="space-y-2">
+              <label className="text-xs font-black uppercase tracking-widest text-on-surface-variant">Tipo de Empreendimento / Área</label>
+              <div className="flex flex-wrap gap-2">
+                {developmentTypes.map(t => (
+                  <button 
+                    key={t.id} 
+                    onClick={() => {
+                      setSelectedDevType(prev => prev === t.id ? "" : t.id);
+                      setSelectedType("");
+                    }}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold border-2 transition-all ${selectedDevType === t.id ? 'bg-tertiary border-tertiary text-on-tertiary shadow-lg shadow-tertiary/20' : 'bg-surface-container-high border-transparent text-on-surface-variant'}`}
+                  >
+                    <span className="material-symbols-outlined text-sm">{t.icon}</span>
+                    {t.label}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
-        </div>
 
-        <div className="space-y-4 pt-4 border-t border-outline-variant/10">
-          <div className="space-y-2">
-            <label className="text-xs font-black uppercase tracking-widest text-on-surface-variant">Tipo de Empreendimento / Área</label>
-            <div className="flex flex-wrap gap-2">
-              {developmentTypes.map(t => (
-                <button 
-                  key={t.id} 
-                  onClick={() => {
-                    setSelectedDevType(prev => prev === t.id ? "" : t.id);
-                    setSelectedType("");
-                  }}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold border-2 transition-all ${selectedDevType === t.id ? 'bg-tertiary border-tertiary text-on-tertiary shadow-lg shadow-tertiary/20' : 'bg-surface-container-high border-transparent text-on-surface-variant'}`}
-                >
-                  <span className="material-symbols-outlined text-sm">{t.icon}</span>
-                  {t.label}
-                </button>
-              ))}
+          <div className="space-y-4 pt-4 border-t border-outline-variant/10">
+            <div className="space-y-2">
+              <label className="text-xs font-black uppercase tracking-widest text-on-surface-variant">Características Desejadas</label>
+              <div className="flex flex-wrap gap-2">
+                {tags.map(tag => (
+                  <button 
+                    key={tag.id} 
+                    onClick={() => toggleTag(tag.id)}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold border-2 transition-all ${selectedTags.includes(tag.id) ? 'bg-secondary border-secondary text-on-secondary shadow-lg shadow-secondary/20' : 'bg-surface-container-high border-transparent text-on-surface-variant hover:border-outline-variant'}`}
+                  >
+                    <span className="material-symbols-outlined text-sm">{tag.icon}</span>
+                    {tag.label}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
-        </div>
 
-        <div className="space-y-4 pt-4 border-t border-outline-variant/10">
-          <div className="space-y-2">
-            <label className="text-xs font-black uppercase tracking-widest text-on-surface-variant">Características Desejadas</label>
-            <div className="flex flex-wrap gap-2">
-              {tags.map(tag => (
-                <button 
-                  key={tag.id} 
-                  onClick={() => toggleTag(tag.id)}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold border-2 transition-all ${selectedTags.includes(tag.id) ? 'bg-secondary border-secondary text-on-secondary shadow-lg shadow-secondary/20' : 'bg-surface-container-high border-transparent text-on-surface-variant hover:border-outline-variant'}`}
-                >
-                  <span className="material-symbols-outlined text-sm">{tag.icon}</span>
-                  {tag.label}
-                </button>
-              ))}
+          {(maxPrice || minSqFt || selectedTags.length > 0 || selectedType || selectedDevType || selectedStatus || searchCity || searchState || searchStreet) && (
+            <div className="flex justify-end pt-2">
+              <button 
+                onClick={() => { 
+                  setMaxPrice(""); 
+                  setMinSqFt("");
+                  setSelectedTags([]); 
+                  setSelectedType(""); 
+                  setSelectedDevType("");
+                  setSelectedStatus(""); 
+                  setSearchCity(""); 
+                  setSearchState("");
+                  setSearchStreet("");
+                }}
+                className="text-primary text-xs font-black uppercase tracking-widest hover:underline flex items-center gap-1"
+              >
+                <span className="material-symbols-outlined text-sm">filter_alt_off</span>
+                Limpar Filtros
+              </button>
             </div>
-          </div>
-        </div>
+          )}
+        </section>
 
-        {(maxPrice || minSqFt || selectedTags.length > 0 || selectedType || selectedDevType || selectedStatus || searchCity || searchState || searchStreet) && (
-          <div className="flex justify-end pt-2">
-            <button 
-              onClick={() => { 
-                setMaxPrice(""); 
-                setMinSqFt("");
-                setSelectedTags([]); 
-                setSelectedType(""); 
-                setSelectedDevType("");
-                setSelectedStatus(""); 
-                setSearchCity(""); 
-                setSearchState("");
-                setSearchStreet("");
-              }}
-              className="text-primary text-xs font-black uppercase tracking-widest hover:underline flex items-center gap-1"
-            >
-              <span className="material-symbols-outlined text-sm">filter_alt_off</span>
-              Limpar Filtros
-            </button>
+        {loading ? (
+          <div className="py-20 text-center text-on-surface/30 animate-pulse">Carregando imóveis...</div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {properties.map((prop) => (
+              <Link key={prop.id} to={`/view/${prop.id}`}>
+                <article className="group bg-surface-container-low rounded-3xl overflow-hidden hover:bg-surface-bright transition-all duration-500 sunken-shadow h-full border border-transparent hover:border-primary/20">
+                  <div className="h-56 overflow-hidden relative">
+                    {prop.hero_image_url?.match(/\.pdf$/i) ? (
+                      <div className="w-full h-full flex flex-col items-center justify-center text-primary bg-primary/5">
+                        <span className="material-symbols-outlined text-5xl">picture_as_pdf</span>
+                        <span className="text-[10px] font-black mt-2 uppercase tracking-widest">Documento PDF</span>
+                      </div>
+                    ) : (
+                      <img src={prop.hero_image_url || "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?q=80&w=2070&auto=format&fit=crop"} alt={prop.title} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" />
+                    )}
+                    <div className="absolute top-4 left-4 bg-primary text-on-primary text-[10px] font-black uppercase tracking-[0.2em] px-3 py-1 rounded-full">
+                      {['dormitory', 'studio', 'commercial', 'house', 'land', 'mixed', 'commercial_center', 'residential_center', 'farm'].includes(prop.unit_type) 
+                        ? t(`consultancy.types.${prop.unit_type}`) 
+                        : 'Imóvel'}
+                    </div>
+                    {prop.status !== 'available' && (
+                      <div className={`absolute top-4 right-4 text-[10px] font-black uppercase tracking-[0.2em] px-3 py-1 rounded-full ${prop.status === 'sold' ? 'bg-red-500 text-white' : 'bg-amber-500 text-white'}`}>
+                        {prop.status === 'sold' ? 'Vendido' : 'Reservado'}
+                      </div>
+                    )}
+                  </div>
+                  <div className="p-8">
+                    <div className="mb-2">
+                      {prop.parent?.title && (
+                        <p className="text-[10px] font-black text-primary uppercase tracking-[0.2em] mb-1">{prop.parent.title}</p>
+                      )}
+                      <h3 className="text-xl font-headline font-bold text-on-surface line-clamp-1 group-hover:text-primary transition-colors">{prop.title}</h3>
+                    </div>
+                    <p className="text-sm text-on-surface-variant flex items-center gap-1 mb-6"><span className="material-symbols-outlined text-sm">location_on</span>{prop.location}</p>
+                    
+                    <div className="flex justify-between items-end border-t border-outline-variant/10 pt-6">
+                      <div>
+                        <p className="text-[10px] font-black text-on-surface-variant/60 uppercase tracking-widest">A partir de</p>
+                        <p className="text-2xl font-headline font-black text-primary">{prop.price_starting_at ? formatCurrency(prop.price_starting_at) : 'Consulte'}</p>
+                      </div>
+                      <div className="flex gap-2">
+                        <span className="material-symbols-outlined text-on-surface-variant/30">chevron_right</span>
+                      </div>
+                    </div>
+                  </div>
+                </article>
+              </Link>
+            ))}
           </div>
         )}
-      </section>
 
-      {loading ? (
-        <div className="py-20 text-center text-on-surface/30 animate-pulse">Carregando imóveis...</div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {properties.map((prop) => (
-            <Link key={prop.id} to={`/view/${prop.id}`}>
-              <article className="group bg-surface-container-low rounded-3xl overflow-hidden hover:bg-surface-bright transition-all duration-500 sunken-shadow h-full border border-transparent hover:border-primary/20">
-                <div className="h-56 overflow-hidden relative">
-                  {prop.hero_image_url?.match(/\.pdf$/i) ? (
-                    <div className="w-full h-full flex flex-col items-center justify-center text-primary bg-primary/5">
-                      <span className="material-symbols-outlined text-5xl">picture_as_pdf</span>
-                      <span className="text-[10px] font-black mt-2 uppercase tracking-widest">Documento PDF</span>
-                    </div>
-                  ) : (
-                    <img src={prop.hero_image_url || "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?q=80&w=2070&auto=format&fit=crop"} alt={prop.title} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" />
-                  )}
-                  <div className="absolute top-4 left-4 bg-primary text-on-primary text-[10px] font-black uppercase tracking-[0.2em] px-3 py-1 rounded-full">
-                    {['dormitory', 'studio', 'commercial', 'house', 'land', 'mixed', 'commercial_center', 'residential_center', 'farm'].includes(prop.unit_type) 
-                      ? t(`consultancy.types.${prop.unit_type}`) 
-                      : 'Imóvel'}
-                  </div>
-                  {prop.status !== 'available' && (
-                    <div className={`absolute top-4 right-4 text-[10px] font-black uppercase tracking-[0.2em] px-3 py-1 rounded-full ${prop.status === 'sold' ? 'bg-red-500 text-white' : 'bg-amber-500 text-white'}`}>
-                      {prop.status === 'sold' ? 'Vendido' : 'Reservado'}
-                    </div>
-                  )}
-                </div>
-                <div className="p-8">
-                  <h3 className="text-xl font-headline font-bold text-on-surface mb-2 line-clamp-1 group-hover:text-primary transition-colors">{prop.title}</h3>
-                  <p className="text-sm text-on-surface-variant flex items-center gap-1 mb-6"><span className="material-symbols-outlined text-sm">location_on</span>{prop.location}</p>
-                  
-                  <div className="flex justify-between items-end border-t border-outline-variant/10 pt-6">
-                    <div>
-                      <p className="text-[10px] font-black text-on-surface-variant/60 uppercase tracking-widest">A partir de</p>
-                      <p className="text-2xl font-headline font-black text-primary">{prop.price_starting_at ? formatCurrency(prop.price_starting_at) : 'Consulte'}</p>
-                    </div>
-                    <div className="flex gap-2">
-                      <span className="material-symbols-outlined text-on-surface-variant/30">chevron_right</span>
-                    </div>
-                  </div>
-                </div>
-              </article>
+        {properties.length === 0 && !loading && (
+          <div className="py-32 text-center">
+            <span className="material-symbols-outlined text-6xl text-on-surface/10 mb-4">home_work</span>
+            <p className="text-on-surface-variant font-body">Nenhum imóvel disponível nesta vitrine no momento.</p>
+          </div>
+        )}
+
+        {ownerTier === 'free' && (
+          <footer className="mt-20 pt-12 border-t border-outline-variant/10 text-center">
+            <Link to="/" className="inline-flex flex-col items-center group">
+              <span className="text-[10px] font-black text-on-surface-variant/40 uppercase tracking-[0.3em] mb-2 group-hover:text-primary transition-colors">Gerado por</span>
+              <div className="flex items-center gap-2">
+                <span className="text-2xl font-headline font-black text-on-surface/20 group-hover:text-primary transition-all">Lumis</span>
+                <span className="material-symbols-outlined text-on-surface/10 group-hover:text-primary transition-all">offline_bolt</span>
+              </div>
+              <p className="mt-2 text-[10px] font-bold text-on-surface-variant/30 uppercase tracking-widest">Inteligência Imobiliária para Corretores Pro</p>
             </Link>
-          ))}
-        </div>
-      )}
-
-      {properties.length === 0 && !loading && (
-        <div className="py-32 text-center">
-          <span className="material-symbols-outlined text-6xl text-on-surface/10 mb-4">home_work</span>
-          <p className="text-on-surface-variant font-body">Nenhum imóvel disponível nesta vitrine no momento.</p>
-        </div>
-      )}
-
-      {ownerTier === 'free' && (
-        <footer className="mt-20 pt-12 border-t border-outline-variant/10 text-center">
-          <Link to="/" className="inline-flex flex-col items-center group">
-            <span className="text-[10px] font-black text-on-surface-variant/40 uppercase tracking-[0.3em] mb-2 group-hover:text-primary transition-colors">Gerado por</span>
-            <div className="flex items-center gap-2">
-              <span className="text-2xl font-headline font-black text-on-surface/20 group-hover:text-primary transition-all">Lumis</span>
-              <span className="material-symbols-outlined text-on-surface/10 group-hover:text-primary transition-all">offline_bolt</span>
-            </div>
-            <p className="mt-2 text-[10px] font-bold text-on-surface-variant/30 uppercase tracking-widest">Inteligência Imobiliária para Corretores Pro</p>
-          </Link>
-        </footer>
-      )}
+          </footer>
+        )}
+      </div>
     </div>
   );
 };
