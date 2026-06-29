@@ -14,6 +14,7 @@ export const Login = () => {
   const [authError, setAuthError] = useState<string | null>(null);
   const [authMessage, setAuthMessage] = useState<string | null>(null);
   const [isSignUp, setIsSignUp] = useState(false);
+  const [isForgotPassword, setIsForgotPassword] = useState(false);
   const [showLangMenu, setShowLangMenu] = useState(false);
   const langMenuRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
@@ -43,7 +44,8 @@ export const Login = () => {
     register,
     handleSubmit,
     formState: { errors },
-    reset
+    reset,
+    watch
   } = useForm<LoginInput>({
     resolver: zodResolver(loginSchema),
   });
@@ -90,6 +92,30 @@ export const Login = () => {
     }
   };
 
+  const handleResetPassword = async () => {
+    const email = watch('email');
+    if (!email) {
+      setAuthError("Por favor, digite seu e-mail no campo acima primeiro.");
+      return;
+    }
+    setLoading(true);
+    setAuthError(null);
+    setAuthMessage(null);
+    try {
+      const baseUrl = window.location.href.split('#')[0];
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${baseUrl}#/update-password`,
+      });
+      if (error) throw error;
+      setAuthMessage("Link de recuperação enviado para " + email);
+      setIsForgotPassword(false);
+    } catch (err: any) {
+      setAuthError(err.message || "Erro ao solicitar recuperação de senha.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="bg-background text-on-background min-h-screen flex items-center justify-center p-4 md:p-8 relative">
       <main className="w-full max-w-6xl h-[800px] max-h-[921px] bg-surface-container-lowest rounded-xl flex flex-col md:flex-row overflow-hidden shadow-[0_12px_40px_rgba(11,28,48,0.06)] relative">
@@ -131,10 +157,10 @@ export const Login = () => {
           ></div>
           <div className="absolute bottom-12 left-12 right-12 glass-panel p-8 rounded-lg">
             <h2 className="font-headline font-bold text-3xl text-on-surface mb-2 tracking-tight">
-              {isSignUp ? "Crie sua conta" : t('login.title')}
+              {isForgotPassword ? "Recuperar Senha" : (isSignUp ? "Crie sua conta" : t('login.title'))}
             </h2>
             <p className="font-body text-on-surface-variant text-sm leading-relaxed">
-              {isSignUp ? "Junte-se ao The Architectural Ledger e comece a gerenciar seus ativos hoje mesmo." : t('login.subtitle')}
+              {isForgotPassword ? "Enviaremos um link seguro para você redefinir seu acesso." : (isSignUp ? "Junte-se ao The Architectural Ledger e comece a gerenciar seus ativos hoje mesmo." : t('login.subtitle'))}
             </p>
           </div>
         </section>
@@ -146,10 +172,10 @@ export const Login = () => {
           <div className="max-w-md w-full mx-auto">
             <div className="mb-10">
               <h1 className="font-headline font-extrabold text-4xl text-on-background mb-3 tracking-[-0.02em]">
-                {isSignUp ? "Cadastrar" : t('login.welcome')}
+                {isForgotPassword ? "Esqueci a Senha" : (isSignUp ? "Cadastrar" : t('login.welcome'))}
               </h1>
               <p className="font-body text-on-surface-variant text-base">
-                {isSignUp ? "Preencha os dados para criar seu acesso." : t('login.enter_details')}
+                {isForgotPassword ? "Informe seu e-mail para receber as instruções." : (isSignUp ? "Preencha os dados para criar seu acesso." : t('login.enter_details'))}
               </p>
             </div>
 
@@ -167,67 +193,104 @@ export const Login = () => {
               </div>
             )}
 
-            <form className="space-y-6" onSubmit={handleSubmit(onSubmit)}>
-              <InputField 
-                label={t('login.email')}
-                type="email"
-                icon="mail"
-                placeholder="consultant@ledger.com"
-                {...register("email")}
-                error={errors.email?.message}
-              />
-
-              <InputField 
-                label={t('login.password')}
-                type="password"
-                icon="lock"
-                placeholder="••••••••"
-                {...register("password")}
-                error={errors.password?.message}
-              />
-
-              {!isSignUp && (
-                <div className="flex items-center justify-between pt-2">
-                  <div className="flex items-center">
-                    <input
-                      className="h-4 w-4 text-primary bg-surface-container-high border-0 rounded focus:ring-primary focus:ring-offset-background"
-                      id="remember-me"
-                      type="checkbox"
-                    />
-                    <label className="ml-3 block text-sm font-body text-on-surface-variant" htmlFor="remember-me">
-                      {t('login.remember')}
-                    </label>
-                  </div>
-                  <div className="text-sm">
-                    <a className="font-body font-medium text-primary hover:text-primary-container transition-colors" href="#">
-                      {t('login.forgot')}
-                    </a>
-                  </div>
+            {isForgotPassword ? (
+              <div className="space-y-6">
+                <InputField 
+                  label={t('login.email')}
+                  type="email"
+                  icon="mail"
+                  placeholder="consultant@ledger.com"
+                  {...register("email")}
+                  error={errors.email?.message}
+                />
+                <div className="pt-4">
+                  <Button className="w-full py-4 text-base font-bold shadow-lg shadow-primary/20" type="button" onClick={handleResetPassword} disabled={loading}>
+                    {loading ? "Enviando..." : "Enviar link de recuperação"}
+                  </Button>
                 </div>
-              )}
-              
-              <div className="pt-4">
-                <Button className="w-full py-4 text-base font-bold shadow-lg shadow-primary/20" type="submit" disabled={loading}>
-                  {loading 
-                    ? (isSignUp ? "Criando conta..." : t('login.signing_in')) 
-                    : (isSignUp ? "Criar conta gratuita" : t('login.sign_in'))
-                  }
-                </Button>
               </div>
-            </form>
+            ) : (
+              <form className="space-y-6" onSubmit={handleSubmit(onSubmit)}>
+                <InputField 
+                  label={t('login.email')}
+                  type="email"
+                  icon="mail"
+                  placeholder="consultant@ledger.com"
+                  {...register("email")}
+                  error={errors.email?.message}
+                />
+
+                <InputField 
+                  label={t('login.password')}
+                  type="password"
+                  icon="lock"
+                  placeholder="••••••••"
+                  {...register("password")}
+                  error={errors.password?.message}
+                />
+
+                {!isSignUp && (
+                  <div className="flex items-center justify-between pt-2">
+                    <div className="flex items-center">
+                      <input
+                        className="h-4 w-4 text-primary bg-surface-container-high border-0 rounded focus:ring-primary focus:ring-offset-background"
+                        id="remember-me"
+                        type="checkbox"
+                      />
+                      <label className="ml-3 block text-sm font-body text-on-surface-variant" htmlFor="remember-me">
+                        {t('login.remember')}
+                      </label>
+                    </div>
+                    <div className="text-sm">
+                      <button 
+                        type="button" 
+                        onClick={() => {
+                          setIsForgotPassword(true);
+                          setAuthError(null);
+                          setAuthMessage(null);
+                        }} 
+                        className="font-body font-medium text-primary hover:text-primary-container transition-colors"
+                      >
+                        {t('login.forgot')}
+                      </button>
+                    </div>
+                  </div>
+                )}
+                
+                <div className="pt-4">
+                  <Button className="w-full py-4 text-base font-bold shadow-lg shadow-primary/20" type="submit" disabled={loading}>
+                    {loading 
+                      ? (isSignUp ? "Criando conta..." : t('login.signing_in')) 
+                      : (isSignUp ? "Criar conta gratuita" : t('login.sign_in'))
+                    }
+                  </Button>
+                </div>
+              </form>
+            )}
 
             <div className="mt-8 text-center text-sm font-body text-on-surface-variant">
-              {isSignUp ? "Já tem uma conta?" : t('login.no_account')}{" "}
-              <button 
-                onClick={() => {
-                  setIsSignUp(!isSignUp);
-                  setAuthError(null);
-                  setAuthMessage(null);
-                }}
-                className="font-medium text-primary hover:text-primary-container transition-colors underline underline-offset-4"
-              >
-                {isSignUp ? "Entrar agora" : "Cadastre-se aqui"}
-              </button>
+              {isForgotPassword ? (
+                <button 
+                  onClick={() => setIsForgotPassword(false)}
+                  className="font-medium text-primary hover:text-primary-container transition-colors underline underline-offset-4"
+                >
+                  Voltar para o login
+                </button>
+              ) : (
+                <>
+                  {isSignUp ? "Já tem uma conta?" : t('login.no_account')}{" "}
+                  <button 
+                    onClick={() => {
+                      setIsSignUp(!isSignUp);
+                      setAuthError(null);
+                      setAuthMessage(null);
+                    }}
+                    className="font-medium text-primary hover:text-primary-container transition-colors underline underline-offset-4"
+                  >
+                    {isSignUp ? "Entrar agora" : "Cadastre-se aqui"}
+                  </button>
+                </>
+              )}
             </div>
           </div>
         </section>

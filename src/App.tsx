@@ -4,6 +4,7 @@ import { Dashboard } from './pages/Dashboard';
 import { Builders } from './pages/Builders';
 import { Developments } from './pages/Developments';
 import { Login } from './pages/Login';
+import { UpdatePassword } from './pages/UpdatePassword';
 import { RegisterBuilder } from './pages/RegisterBuilder';
 import { PropertyDetails } from './pages/PropertyDetails';
 import { NewDevelopment } from './pages/NewDevelopment';
@@ -25,6 +26,7 @@ function App() {
         {/* Public Routes */}
         <Route path="/login" element={<Login />} />
         <Route path="/register-public" element={<RegisterBuilder />} />
+        <Route path="/update-password" element={<UpdatePassword />} />
         <Route path="/view/:id" element={<PropertyPublic />} />
         <Route path="/:userId" element={<Showcase />} />
         
