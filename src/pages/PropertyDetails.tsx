@@ -59,6 +59,22 @@ export const PropertyDetails = () => {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    // 1. Validação de Formato
+    if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) {
+      alert("Formato inválido! Por favor, envie apenas arquivos no formato PDF.");
+      if (e.target) e.target.value = '';
+      return;
+    }
+
+    // 2. Validação de Tamanho (Ex: limite de 20MB para plantas)
+    const MAX_SIZE_MB = 20;
+    const MAX_SIZE_BYTES = MAX_SIZE_MB * 1024 * 1024;
+    if (file.size > MAX_SIZE_BYTES) {
+      alert(`Ops! O Caderno de Plantas é muito grande (${(file.size / (1024 * 1024)).toFixed(1)}MB). O limite para Extração Mágica é de ${MAX_SIZE_MB}MB.`);
+      if (e.target) e.target.value = '';
+      return;
+    }
+
     setProcessingFloorPlanPdf(true);
     setExtractionProgress({ current: 0, total: 0, message: "Iniciando motor visual..." });
     setFloorPlansExtracted([]);
@@ -115,13 +131,24 @@ export const PropertyDetails = () => {
       setExtractionProgress({ current: numPages, total: numPages, message: "Mágica concluída!" });
       
       if (allExtractedPlans.length === 0) {
+        alert("Leitura concluída, mas não encontramos nenhuma planta baixa neste documento. O PDF pode não conter layouts arquitetônicos claros ou formatos reconhecíveis pela IA.");
         URL.revokeObjectURL(fileUrl); // Limpar se não encontrou nada
         setFloorPlanPdfUrl(null);
       }
 
     } catch (error: any) {
       console.error("ERRO FATAL NA EXTRAÇÃO VISUAL:", error);
-      alert("Erro na extração visual: " + error.message);
+      
+      let errorMessage = "Tivemos um problema interno ao analisar o Caderno de Plantas. Por favor, tente novamente.";
+      const errorStr = String(error.message || error).toLowerCase();
+      
+      if (errorStr.includes('timeout') || errorStr.includes('network') || errorStr.includes('fetch')) {
+        errorMessage = "A Extração Mágica demorou mais que o esperado ou houve uma falha de conexão. Cadernos com dezenas de páginas podem causar isso. Tente dividir o PDF ou verificar sua internet.";
+      } else if (error.message) {
+        errorMessage = `Falha na IA Visual: ${error.message}`;
+      }
+      
+      alert(errorMessage);
     } finally {
       setProcessingFloorPlanPdf(false);
       // Reset input value to allow selecting same file again
@@ -301,6 +328,22 @@ export const PropertyDetails = () => {
     const file = e.target.files?.[0];
     if (!file || !id) return;
 
+    // 1. Validação de Formato
+    if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) {
+      alert("Formato inválido! Por favor, envie apenas arquivos no formato PDF.");
+      if (e.target) e.target.value = '';
+      return;
+    }
+
+    // 2. Validação de Tamanho (Ex: limite de 10MB)
+    const MAX_SIZE_MB = 10;
+    const MAX_SIZE_BYTES = MAX_SIZE_MB * 1024 * 1024;
+    if (file.size > MAX_SIZE_BYTES) {
+      alert(`Ops! O arquivo é muito grande (${(file.size / (1024 * 1024)).toFixed(1)}MB). O limite é de ${MAX_SIZE_MB}MB.`);
+      if (e.target) e.target.value = '';
+      return;
+    }
+
     if (tier === 'free') {
       alert("No plano gratuito, a IA de PDF é limitada para testes. Para processar tabelas ilimitadas e ter suporte prioritário, faça upgrade para o plano Pro!");
     }
@@ -327,6 +370,11 @@ export const PropertyDetails = () => {
           extractedText += item.str + '  '; 
         });
         extractedText += '\n\n---FIM DA PÁGINA---\n\n';
+      }
+
+      if (extractedText.trim().length === 0) {
+        alert("Não encontramos texto neste PDF. Certifique-se de que o documento não é apenas uma imagem escaneada sem texto selecionável.");
+        return;
       }
 
       const { data: { user } } = await supabase.auth.getUser();
@@ -520,7 +568,17 @@ export const PropertyDetails = () => {
       fetchSubUnits();
     } catch (error: any) {
       console.error("Error processing PDF:", error);
-      alert("Falha ao processar PDF: " + error.message);
+      
+      let errorMessage = "Tivemos um problema interno ao processar o seu documento. Por favor, tente novamente.";
+      const errorStr = String(error.message || error).toLowerCase();
+      
+      if (errorStr.includes('timeout') || errorStr.includes('network') || errorStr.includes('fetch')) {
+        errorMessage = "A leitura demorou mais que o esperado ou houve uma falha de conexão. Tente enviar um documento menor ou verifique sua internet.";
+      } else if (error.message) {
+        errorMessage = `Falha na IA: ${error.message}`;
+      }
+      
+      alert(errorMessage);
     } finally {
       setProcessingPdf(false);
       if (e.target) e.target.value = '';

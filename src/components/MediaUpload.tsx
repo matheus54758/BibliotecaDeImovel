@@ -20,7 +20,30 @@ export const MediaUpload = ({ onUpload, label, className, previewUrl, accept = '
 
       const files = event.target.files;
       if (!files || files.length === 0) {
-        throw new Error('You must select at least one file to upload.');
+        throw new Error('Você deve selecionar pelo menos um arquivo.');
+      }
+
+      // Validação de Tamanho e Tipo antes de iniciar o upload
+      for (const file of Array.from(files)) {
+        const isVideo = file.type.startsWith('video/') || file.name.match(/\.(mp4|webm|ogg|mov)$/i);
+        const isImage = file.type.startsWith('image/') && !file.name.match(/\.pdf$/i);
+        const isPdf = file.type === 'application/pdf' || file.name.match(/\.pdf$/i);
+        
+        // Limites de tamanho amigáveis
+        const MAX_IMAGE_SIZE = 5 * 1024 * 1024; // 5MB
+        const MAX_VIDEO_SIZE = 50 * 1024 * 1024; // 50MB
+        const MAX_PDF_SIZE = 20 * 1024 * 1024; // 20MB
+        const fileSizeMB = (file.size / (1024 * 1024)).toFixed(1);
+
+        if (isVideo && file.size > MAX_VIDEO_SIZE) {
+          throw new Error(`O vídeo "${file.name}" é muito pesado (${fileSizeMB}MB). O limite é 50MB para garantir velocidade no site.`);
+        }
+        if (isImage && file.size > MAX_IMAGE_SIZE) {
+          throw new Error(`A imagem "${file.name}" é muito pesada (${fileSizeMB}MB). O limite é 5MB. Tente reduzir a resolução.`);
+        }
+        if (isPdf && file.size > MAX_PDF_SIZE) {
+          throw new Error(`O PDF "${file.name}" tem ${fileSizeMB}MB. O limite permitido é de 20MB.`);
+        }
       }
 
       const uploadPromises = Array.from(files).map(async (file) => {
@@ -50,7 +73,11 @@ export const MediaUpload = ({ onUpload, label, className, previewUrl, accept = '
         onUpload(newUrls[0]);
       }
     } catch (error: any) {
-      alert(error.message);
+      const msg = error.message.includes('Fetch') || error.message.includes('network') 
+        ? "Sua conexão de internet caiu ou oscilou durante o envio. Tente novamente." 
+        : error.message;
+      alert(`Erro no upload: ${msg}`);
+      if (event.target) event.target.value = '';
     } finally {
       setUploading(false);
     }

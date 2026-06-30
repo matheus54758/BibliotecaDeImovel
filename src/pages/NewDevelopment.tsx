@@ -233,6 +233,15 @@ export const NewDevelopment = () => {
   }, [id, isEditing, reset, navigate, t, parentIdFromUrl, searchParams]);
 
   const onSubmit = async (data: DevelopmentInput) => {
+    if (!data.hero_image_url && !parentId) {
+      alert("Por favor, adicione uma Imagem de Capa para salvar e manter o catálogo bonito.");
+      return;
+    }
+    if (!data.title || data.title.trim() === '') {
+      alert("O campo Título é obrigatório.");
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -345,7 +354,10 @@ export const NewDevelopment = () => {
       }
     } catch (error: any) {
       console.error("Error saving development:", error);
-      alert(`Erro: ${error.message}`);
+      const msg = error.message.toLowerCase().includes('fetch') || error.message.toLowerCase().includes('network') 
+        ? "Falha de conexão. Não foi possível salvar no banco de dados. Verifique sua internet e tente novamente."
+        : `Erro ao salvar: ${error.message}`;
+      alert(msg);
     } finally {
       setLoading(false);
     }

@@ -52,7 +52,7 @@ export const Consultancy = () => {
 
   useEffect(() => {
     fetchFilteredProperties();
-  }, [selectedTags, maxPrice, selectedType, selectedStatus, searchState, searchCity, searchStreet]);
+  }, [selectedTags, maxPrice, selectedType, selectedDevType, selectedStatus, searchState, searchCity, searchStreet, minSqFt]);
 
   // Street Autocomplete Logic
   useEffect(() => {

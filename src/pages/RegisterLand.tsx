@@ -112,6 +112,15 @@ export const RegisterLand = () => {
   }, [id, isEditing, reset, navigate]);
 
   const onSubmit: SubmitHandler<DevelopmentInput> = async (data) => {
+    if (!data.hero_image_url) {
+      alert("Por favor, adicione uma Imagem de Capa (Foto Principal) para o terreno.");
+      return;
+    }
+    if (!data.title || data.title.trim() === '') {
+      alert("O campo Título é obrigatório para cadastrar um terreno.");
+      return;
+    }
+
     setLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -154,7 +163,10 @@ export const RegisterLand = () => {
       navigate("/lands");
     } catch (error: any) {
       console.error("Error saving land:", error);
-      alert(`Erro: ${error.message}`);
+      const msg = error.message.toLowerCase().includes('fetch') || error.message.toLowerCase().includes('network') 
+        ? "Falha de conexão. O terreno não pôde ser salvo no banco de dados. Verifique sua internet."
+        : `Erro ao salvar: ${error.message}`;
+      alert(msg);
     } finally {
       setLoading(false);
     }
