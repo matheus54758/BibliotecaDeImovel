@@ -23,6 +23,7 @@ export const Consultancy = () => {
   const [showSuggestions, setShowSuggestions] = useState(false);
 
   const propertyTypes = [
+    { id: 'rental', label: 'Aluguel', icon: 'key' },
     { id: 'dormitory', label: 'Apartamento', icon: 'apartment' },
     { id: 'studio', label: 'Studio', icon: 'grid_view' },
     { id: 'commercial', label: 'Comercial', icon: 'storefront' },
@@ -397,9 +398,11 @@ export const Consultancy = () => {
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
                     />
                     <div className="absolute top-4 left-4 backdrop-blur px-3 py-1 rounded-full text-[10px] font-bold bg-primary/90 text-on-primary uppercase tracking-widest">
-                      {['land', 'mixed', 'commercial_center', 'residential_center', 'dormitory', 'studio', 'commercial', 'house', 'farm'].includes(prop.unit_type) 
-                        ? t(`consultancy.types.${prop.unit_type}`) 
-                        : t('nav.developments')}
+                      {prop.unit_type === 'rental'
+                        ? 'Aluguel'
+                        : (['land', 'mixed', 'commercial_center', 'residential_center', 'dormitory', 'studio', 'commercial', 'house', 'farm'].includes(prop.unit_type) 
+                            ? t(`consultancy.types.${prop.unit_type}`) 
+                            : (prop.parent_id ? 'Unidade' : 'Imóvel'))}
                     </div>
                     <div className={`absolute top-4 right-4 backdrop-blur px-3 py-1 rounded-full text-xs font-bold ${
                       prop.title?.includes('(INDISPONÍVEL)') 

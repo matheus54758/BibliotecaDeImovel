@@ -25,6 +25,7 @@ export const Showcase = () => {
   const [searchStreet, setSearchStreet] = useState<string>("");
 
   const propertyTypes = [
+    { id: 'rental', label: 'Aluguel', icon: 'key' },
     { id: 'dormitory', label: 'Apartamento', icon: 'apartment' },
     { id: 'studio', label: 'Studio', icon: 'grid_view' },
     { id: 'commercial', label: 'Comercial', icon: 'storefront' },
@@ -347,9 +348,11 @@ export const Showcase = () => {
                       <img src={prop.hero_image_url || "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?q=80&w=2070&auto=format&fit=crop"} alt={prop.title} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" />
                     )}
                     <div className="absolute top-4 left-4 bg-primary text-on-primary text-[10px] font-black uppercase tracking-[0.2em] px-3 py-1 rounded-full">
-                      {['dormitory', 'studio', 'commercial', 'house', 'land', 'mixed', 'commercial_center', 'residential_center', 'farm'].includes(prop.unit_type) 
-                        ? t(`consultancy.types.${prop.unit_type}`) 
-                        : 'Imóvel'}
+                      {prop.unit_type === 'rental' 
+                        ? 'Aluguel'
+                        : (['dormitory', 'studio', 'commercial', 'house', 'land', 'mixed', 'commercial_center', 'residential_center', 'farm'].includes(prop.unit_type) 
+                          ? t(`consultancy.types.${prop.unit_type}`) 
+                          : 'Imóvel')}
                     </div>
                     {prop.status !== 'available' && (
                       <div className={`absolute top-4 right-4 text-[10px] font-black uppercase tracking-[0.2em] px-3 py-1 rounded-full ${prop.status === 'sold' ? 'bg-red-500 text-white' : 'bg-amber-500 text-white'}`}>

@@ -29,6 +29,27 @@ export const generatePropertyPDF = async (property: any, amenities: any[], galle
     const gold: [number, number, number] = theme?.primary_color ? hexToRgb(theme.primary_color) : [212, 175, 55]; 
     const black: [number, number, number] = [0, 0, 0];
     const isProject = property.parent_id === null && property.builder_id !== null;
+    const isRental = property.unit_type === 'rental';
+    const isStandaloneProperty = property.parent_id === null && property.builder_id === null && !isRental;
+
+    // Convert boolean fields to amenities
+    const propertyFeatures = [];
+    if (property.has_garage) propertyFeatures.push("Garagem");
+    if (property.near_beach) propertyFeatures.push("Próximo à Praia");
+    if (property.is_furnished) propertyFeatures.push("Mobiliado");
+    if (property.has_balcony_grill) propertyFeatures.push("Sacada com Churrasqueira");
+    if (property.is_penthouse) propertyFeatures.push("Cobertura");
+    if (property.has_sea_view) propertyFeatures.push("Vista para o Mar");
+    if (property.is_pet_friendly) propertyFeatures.push("Pet Friendly");
+    if (property.has_complete_leisure) propertyFeatures.push("Lazer Completo");
+    if (property.has_automation) propertyFeatures.push("Automação");
+    
+    const existingAmenityNames = amenities.map(a => a.name);
+    propertyFeatures.forEach(feature => {
+      if (!existingAmenityNames.includes(feature)) {
+        amenities.push({ name: feature });
+      }
+    });
 
     const addImageToPDF = (url: string, x: number, y: number, w: number, h: number): Promise<void> => {
       return new Promise((resolve) => {
@@ -96,7 +117,11 @@ export const generatePropertyPDF = async (property: any, amenities: any[], galle
       doc.setTextColor(gold[0], gold[1], gold[2]);
       doc.setFontSize(18);
       doc.setFont('helvetica', 'bold');
-      doc.text(`Valor: ${formatCurrency(property.price_starting_at)}`, 15, 180);
+      if (isRental) {
+        doc.text(`Aluguel Mensal: ${formatCurrency(property.price_starting_at)}`, 15, 180);
+      } else {
+        doc.text(`Valor: ${formatCurrency(property.price_starting_at)}`, 15, 180);
+      }
     }
     
     doc.setDrawColor(gold[0], gold[1], gold[2]);
@@ -136,16 +161,21 @@ export const generatePropertyPDF = async (property: any, amenities: any[], galle
       // Payment Plan Section for sub-units/standalone properties
       if (property.price_starting_at > 0) {
         const paymentData = [];
-        if (property.payment_entry > 0) paymentData.push(['Entrada', formatCurrency(property.payment_entry)]);
-        if (property.payment_installment_count > 0) paymentData.push([`${property.payment_installment_count}x Mensais`, formatCurrency(property.payment_installment_value)]);
-        if (property.payment_reinforcement_count > 0) paymentData.push([`${property.payment_reinforcement_count}x Reforços`, formatCurrency(property.payment_reinforcement_value)]);
-        if (property.payment_post_construction > 0) paymentData.push(['Saldo Pós-Obra', formatCurrency(property.payment_post_construction)]);
+        if (isRental) {
+          if (property.cub_monthly_rate > 0) paymentData.push(['Condomínio (Estimado)', formatCurrency(property.cub_monthly_rate)]);
+          if (property.payment_entry > 0) paymentData.push(['IPTU (Mensal)', formatCurrency(property.payment_entry)]);
+        } else {
+          if (property.payment_entry > 0) paymentData.push(['Entrada', formatCurrency(property.payment_entry)]);
+          if (property.payment_installment_count > 0) paymentData.push([`${property.payment_installment_count}x Mensais`, formatCurrency(property.payment_installment_value)]);
+          if (property.payment_reinforcement_count > 0 && !isStandaloneProperty) paymentData.push([`${property.payment_reinforcement_count}x Reforços`, formatCurrency(property.payment_reinforcement_value)]);
+          if (property.payment_post_construction > 0) paymentData.push([isStandaloneProperty ? 'Financiamento Bancário' : 'Saldo Pós-Obra', formatCurrency(property.payment_post_construction)]);
+        }
         
         if (paymentData.length > 0) {
           doc.setTextColor(black[0], black[1], black[2]);
           doc.setFontSize(14);
           doc.setFont('helvetica', 'bold');
-          doc.text("Plano de Pagamento", 15, currentYAfterHeader + 10);
+          doc.text(isRental ? "Encargos da Locação" : "Plano de Pagamento", 15, currentYAfterHeader + 10);
 
           autoTable(doc, {
             startY: currentYAfterHeader + 15,
@@ -161,7 +191,7 @@ export const generatePropertyPDF = async (property: any, amenities: any[], galle
     }
 
       // Investment / ROI Projections
-      if (property.roi_appreciation_1y > 0 || property.rent_annual > 0 || property.rent_seasonal > 0 || property.sale_value_after_keys > 0 || property.cub_monthly_rate > 0) {
+      if (!isRental && (property.roi_appreciation_1y > 0 || property.rent_annual > 0 || property.rent_seasonal > 0 || property.sale_value_after_keys > 0 || property.cub_monthly_rate > 0)) {
         if (currentYAfterHeader > 220) {
            doc.addPage();
            currentYAfterHeader = 20;
@@ -185,16 +215,16 @@ export const generatePropertyPDF = async (property: any, amenities: any[], galle
         
         const roiData = [];
         
-        if (property.roi_appreciation_1y > 0) roiData.push(['Valorização em 12 Meses', `+${property.roi_appreciation_1y}%`]);
-        if (property.roi_appreciation_2y > 0) roiData.push(['Valorização em 24 Meses', `+${property.roi_appreciation_2y}%`]);
-        if (property.roi_appreciation_3y > 0) roiData.push(['Valorização em 36 Meses', `+${property.roi_appreciation_3y}%`]);
+        if (property.roi_appreciation_1y > 0 && !isStandaloneProperty) roiData.push(['Valorização em 12 Meses', `+${property.roi_appreciation_1y}%`]);
+        if (property.roi_appreciation_2y > 0 && !isStandaloneProperty) roiData.push(['Valorização em 24 Meses', `+${property.roi_appreciation_2y}%`]);
+        if (property.roi_appreciation_3y > 0 && !isStandaloneProperty) roiData.push(['Valorização em 36 Meses', `+${property.roi_appreciation_3y}%`]);
         
         if (property.rent_seasonal > 0) roiData.push(['Renda Passiva: Temporada (mês)', formatCurrency(property.rent_seasonal)]);
         if (property.rent_annual > 0) roiData.push(['Renda Passiva: Anual (mês)', formatCurrency(property.rent_annual)]);
         
-        if (property.sale_value_after_keys > 0) roiData.push(['Projeção de Venda nas Chaves', formatCurrency(property.sale_value_after_keys)]);
-        if (property.cub_monthly_rate > 0) roiData.push(['Reajuste CUB Estimado (a.m.)', `+${property.cub_monthly_rate}%`]);
-        if (property.months_until_keys > 0) roiData.push(['Prazo Estimado para Chaves', `${property.months_until_keys} meses`]);
+        if (property.sale_value_after_keys > 0 && !isStandaloneProperty) roiData.push(['Projeção de Venda nas Chaves', formatCurrency(property.sale_value_after_keys)]);
+        if (property.cub_monthly_rate > 0 && !isStandaloneProperty) roiData.push(['Reajuste CUB Estimado (a.m.)', `+${property.cub_monthly_rate}%`]);
+        if (property.months_until_keys > 0 && !isStandaloneProperty) roiData.push(['Prazo Estimado para Chaves', `${property.months_until_keys} meses`]);
 
         if (roiData.length > 0) {
            autoTable(doc, {

@@ -20,36 +20,80 @@ serve(async (req) => {
 
     console.log(`Buscando dados de viabilidade no GeoFloripa para o IPTU: ${iptu}`)
 
+    // 1. Busca do token dinâmico para evitar 401 Unauthorized
+    let dynamicToken = "971d7d5497881c0088d1ad6fdbf6bcd7"; // Token atualizado como fallback
+    try {
+      const siteRes = await fetch("https://geo.pmf.sc.gov.br/");
+      const htmlText = await siteRes.text();
+      const jsMatch = htmlText.match(/\/static\/js\/main\.[a-z0-9]+\.chunk\.js/);
+      if (jsMatch) {
+        const jsRes = await fetch(`https://geo.pmf.sc.gov.br${jsMatch[0]}`);
+        const jsText = await jsRes.text();
+        // Pode estar como "X-User-Token":"..." ou ["X-User-Token"]="..."
+        const tokenMatch = jsText.match(/\[?["']X-User-Token["']\]?\s*[:=]\s*["']([a-f0-9]{32})["']/i);
+        if (tokenMatch && tokenMatch[1]) {
+          dynamicToken = tokenMatch[1];
+          console.log("Token extraído dinamicamente com sucesso!");
+        }
+      }
+    } catch (e) {
+      console.log('Falha na busca dinâmica do token. Usando fallback.', e.message);
+    }
+
     // Faz a requisição oficial para a API oculta do GeoFloripa
     const url = "https://geofloripa.pmf.sc.gov.br/urbano/relatorios/consulta_viabilidade_para_construcao";
     
-    // Tratamento básico para garantir formato do IPTU (Ex: 32.30.051.0676.001-400)
-    let formattedIptu = iptu;
-    const cleanIptu = iptu.replace(/\D/g, '');
-    if (cleanIptu.length === 17 && !iptu.includes('.')) {
-      // 32 30 051 0676 001 400 -> 32.30.051.0676.001-400
-      formattedIptu = `${cleanIptu.substring(0,2)}.${cleanIptu.substring(2,4)}.${cleanIptu.substring(4,7)}.${cleanIptu.substring(7,11)}.${cleanIptu.substring(11,14)}-${cleanIptu.substring(14)}`;
+    // Tratamento robusto para garantir o formato correto do IPTU (Ex: 32.30.051.0676.001-400)
+    // Remove tudo que não for número (pontos, traços, barras, espaços, etc)
+    const cleanIptu = String(iptu).replace(/\D/g, '');
+    
+    if (cleanIptu.length !== 17) {
+      throw new Error('Formato de IPTU inválido. Verifique se o número contém exatamente 17 dígitos.');
     }
 
-    const pmfRes = await fetch(url, {
-      method: "POST",
-      headers: {
-        "accept": "application/json",
-        "content-type": "application/json",
-        "x-user-login": "geoportal",
-        "x-user-token": "30ac2251814ad72af037e2ec217c7bfc",
-        "Referer": "https://geo.pmf.sc.gov.br/"
-      },
-      body: JSON.stringify({
-        "inscricao": formattedIptu,
-        "usos_construcao": [4]
-      })
-    });
+    // Aplica a máscara padrão oficial: XX.XX.XXX.XXXX.XXX-XXX
+    const formattedIptu = `${cleanIptu.substring(0,2)}.${cleanIptu.substring(2,4)}.${cleanIptu.substring(4,7)}.${cleanIptu.substring(7,11)}.${cleanIptu.substring(11,14)}-${cleanIptu.substring(14)}`;
 
-    const data = await pmfRes.json();
+    let pmfRes;
+    try {
+      pmfRes = await fetch(url, {
+        method: "POST",
+        headers: {
+          "accept": "application/json",
+          "content-type": "application/json",
+          "x-user-login": "geoportal",
+          "x-user-token": dynamicToken,
+          "Referer": "https://geo.pmf.sc.gov.br/"
+        },
+        body: JSON.stringify({
+          "inscricao": formattedIptu,
+          "usos_construcao": [4]
+        })
+      });
+    } catch (e) {
+      throw new Error('Erro de conexão com o sistema da Prefeitura. Tente novamente mais tarde.');
+    }
+
+    let data;
+    try {
+      data = await pmfRes.json();
+    } catch (e) {
+      // Se a resposta não for JSON, o servidor da PMF pode estar retornando uma página HTML de erro (ex: 502 Bad Gateway)
+      throw new Error('O sistema do GeoFloripa está temporariamente indisponível ou em manutenção.');
+    }
     
-    if (!data.success || !data.report_response?.html) {
-      throw new Error('Não foi possível gerar o relatório de viabilidade para este IPTU.');
+    if (!data.success) {
+      const msg = data.message ? data.message.toLowerCase() : '';
+      if (msg.includes('não encontrada')) {
+        throw new Error('Este número de IPTU não foi encontrado na base de dados da Prefeitura.');
+      } else if (msg.includes('unauthorized') || msg.includes('não autorizado') || msg.includes('token')) {
+        throw new Error('Acesso negado no sistema da Prefeitura (Problema de Token).');
+      }
+      throw new Error(data.message || 'A Prefeitura não retornou os dados de viabilidade para este IPTU.');
+    }
+
+    if (!data.report_response?.html) {
+      throw new Error('O relatório foi gerado pela Prefeitura, mas o formato está vazio ou irreconhecível.');
     }
 
     const html = data.report_response.html;

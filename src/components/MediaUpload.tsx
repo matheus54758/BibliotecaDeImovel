@@ -14,6 +14,57 @@ interface MediaUploadProps {
 export const MediaUpload = ({ onUpload, label, className, previewUrl, accept = 'both', multiple = false }: MediaUploadProps) => {
   const [uploading, setUploading] = useState(false);
 
+  // Função para comprimir imagens direto no navegador antes de enviar
+  const compressImage = async (file: File): Promise<File> => {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = (event) => {
+        const img = new Image();
+        img.src = event.target?.result as string;
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const MAX_WIDTH = 1920;
+          const MAX_HEIGHT = 1080;
+          let width = img.width;
+          let height = img.height;
+
+          if (width > height) {
+            if (width > MAX_WIDTH) {
+              height *= MAX_WIDTH / width;
+              width = MAX_WIDTH;
+            }
+          } else {
+            if (height > MAX_HEIGHT) {
+              width *= MAX_HEIGHT / height;
+              height = MAX_HEIGHT;
+            }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx?.drawImage(img, 0, 0, width, height);
+
+          // Converte para WebP com 80% de qualidade (WebP é muito mais eficiente que JPEG)
+          canvas.toBlob((blob) => {
+            if (blob) {
+              const compressedFile = new File([blob], file.name.replace(/\.[^/.]+$/, ".webp"), {
+                type: 'image/webp',
+                lastModified: Date.now(),
+              });
+              resolve(compressedFile);
+            } else {
+              resolve(file); // fallback se der erro
+            }
+          }, 'image/webp', 0.80);
+        };
+        img.onerror = () => resolve(file); // fallback
+      };
+      reader.onerror = () => resolve(file); // fallback
+    });
+  };
+
   const uploadMedia = async (event: React.ChangeEvent<HTMLInputElement>) => {
     try {
       setUploading(true);
@@ -30,30 +81,38 @@ export const MediaUpload = ({ onUpload, label, className, previewUrl, accept = '
         const isPdf = file.type === 'application/pdf' || file.name.match(/\.pdf$/i);
         
         // Limites de tamanho amigáveis
-        const MAX_IMAGE_SIZE = 5 * 1024 * 1024; // 5MB
-        const MAX_VIDEO_SIZE = 50 * 1024 * 1024; // 50MB
+        const MAX_IMAGE_SIZE = 15 * 1024 * 1024; // Aumentado para 15MB já que vamos comprimir
+        const MAX_VIDEO_SIZE = 250 * 1024 * 1024; // Aumentado para 250MB para acomodar vídeos originais pesados
         const MAX_PDF_SIZE = 20 * 1024 * 1024; // 20MB
         const fileSizeMB = (file.size / (1024 * 1024)).toFixed(1);
 
         if (isVideo && file.size > MAX_VIDEO_SIZE) {
-          throw new Error(`O vídeo "${file.name}" é muito pesado (${fileSizeMB}MB). O limite é 50MB para garantir velocidade no site.`);
+          throw new Error(`O vídeo "${file.name}" é muito pesado (${fileSizeMB}MB). O limite de envio é 250MB.`);
         }
         if (isImage && file.size > MAX_IMAGE_SIZE) {
-          throw new Error(`A imagem "${file.name}" é muito pesada (${fileSizeMB}MB). O limite é 5MB. Tente reduzir a resolução.`);
+          throw new Error(`A imagem "${file.name}" é muito pesada (${fileSizeMB}MB). O limite é 15MB.`);
         }
         if (isPdf && file.size > MAX_PDF_SIZE) {
-          throw new Error(`O PDF "${file.name}" tem ${fileSizeMB}MB. O limite permitido é de 20MB.`);
+          throw new Error(`O PDF "${file.name}" está muito pesado (${fileSizeMB}MB). Para não deixar o sistema lento, o limite é 20MB. Dica: Acesse ilovepdf.com/pt/comprimir_pdf para diminuir o tamanho do arquivo gratuitamente antes de enviar!`);
         }
       }
 
       const uploadPromises = Array.from(files).map(async (file) => {
-        const fileExt = file.name.split('.').pop();
+        let fileToUpload = file;
+        
+        // Aplica a compressão se for uma imagem
+        const isImage = file.type.startsWith('image/') && !file.name.match(/\.pdf$/i);
+        if (isImage) {
+           fileToUpload = await compressImage(file);
+        }
+
+        const fileExt = fileToUpload.name.split('.').pop();
         const fileName = `${Math.random().toString(36).substring(2)}_${Date.now()}.${fileExt}`;
         const filePath = `${fileName}`;
 
         const { error: uploadError } = await supabase.storage
           .from('assets')
-          .upload(filePath, file);
+          .upload(filePath, fileToUpload);
 
         if (uploadError) throw uploadError;
 

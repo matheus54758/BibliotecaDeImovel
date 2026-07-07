@@ -18,6 +18,7 @@ import { LotAnalyzer } from './pages/LotAnalyzer';
 import { Branding } from './pages/Branding';
 import { Showcase } from './pages/Showcase';
 import { PropertyPublic } from './pages/PropertyPublic';
+import { Rentals } from './pages/Rentals';
 
 function App() {
   return (
@@ -43,6 +44,12 @@ function App() {
             <Route path="/developments/:id" element={<PropertyDetails />} />
             <Route path="/developments/edit/:id" element={<NewDevelopment />} />
             <Route path="/lot-analyzer" element={<LotAnalyzer />} />
+            
+            {/* Rentals Routes */}
+            <Route path="/rentals" element={<Rentals />} />
+            <Route path="/rentals/:id" element={<PropertyDetails />} />
+            <Route path="/rentals/new" element={<NewDevelopment />} />
+            <Route path="/rentals/edit/:id" element={<NewDevelopment />} />
             
             {/* New Distinct Routes */}
             <Route path="/projects/:id" element={<PropertyDetails />} />

@@ -722,10 +722,10 @@ export const PropertyDetails = () => {
           <li><span className="material-symbols-outlined text-[10px]">chevron_right</span></li>
           <li>
             <button 
-              onClick={() => navigate(property.builder_id ? '/project-developments' : '/developments')} 
+              onClick={() => navigate(property.unit_type === 'rental' ? '/rentals' : (property.builder_id ? '/project-developments' : '/developments'))} 
               className="hover:text-primary transition-colors"
             >
-              {property.builder_id ? t('nav.project_developments') : (isStandaloneProperty ? "Imóveis" : t('nav.developments'))}
+              {property.unit_type === 'rental' ? 'Aluguéis' : (property.builder_id ? t('nav.project_developments') : (isStandaloneProperty ? "Imóveis" : t('nav.developments')))}
             </button>
           </li>
           {isSubUnit && (
@@ -741,9 +741,11 @@ export const PropertyDetails = () => {
           <Link to={
             property.unit_type === 'land'
               ? `/lands/edit/${id}`
-              : (property.parent_id !== null 
-                  ? `/units/edit/${id}` 
-                  : (isStandaloneProperty ? `/units/edit/${id}?type=property` : `/projects/edit/${id}?type=project`))
+              : (property.unit_type === 'rental'
+                  ? `/rentals/edit/${id}?unitType=rental`
+                  : (property.parent_id !== null 
+                      ? `/units/edit/${id}` 
+                      : (isStandaloneProperty ? `/units/edit/${id}?type=property` : `/projects/edit/${id}?type=project`)))
           }><button className="text-primary hover:bg-primary/10 p-2 rounded-full transition-colors flex items-center gap-2"><span className="material-symbols-outlined">edit</span><span className="text-sm font-medium">{t('common.edit')}</span></button></Link>
           <button onClick={handleDelete} disabled={deleting} className="text-error hover:bg-error/10 p-2 rounded-full transition-colors flex items-center gap-2"><span className="material-symbols-outlined">{deleting ? 'sync' : 'delete'}</span><span className="text-sm font-medium">{deleting ? t('common.deleting') : t('common.delete')}</span></button>
         </div>
@@ -813,48 +815,67 @@ export const PropertyDetails = () => {
             {showPaymentPlan && property.price_starting_at > 0 && (
               <section className="bg-primary/5 p-10 rounded-xl border border-primary/10">
                 <h2 className="text-2xl font-headline font-bold text-primary mb-6 tracking-tight flex items-center gap-2">
-                  <span className="material-symbols-outlined">payments</span> Plano de Pagamento
+                  <span className="material-symbols-outlined">payments</span> {property.unit_type === 'rental' ? 'Valores da Locação' : 'Plano de Pagamento'}
                 </h2>
                 <div className="space-y-6">
                   <div className="flex justify-between items-center pb-4 border-b border-primary/10">
-                    <span className="text-sm font-bold text-on-surface-variant uppercase">Valor Total do Ativo</span>
+                    <span className="text-sm font-bold text-on-surface-variant uppercase">{property.unit_type === 'rental' ? 'Aluguel Mensal' : 'Valor Total do Ativo'}</span>
                     <span className="text-4xl font-headline font-black text-primary">{formatCurrency(property.price_starting_at || 0)}</span>
                   </div>
                   
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-6 pt-4">
-                    {property.payment_entry > 0 && (
-                      <div className="flex justify-between items-center py-2 border-b border-outline-variant/10">
-                        <span className="text-base text-on-surface-variant">Entrada</span>
-                        <span className="text-xl font-bold text-on-surface">{formatCurrency(property.payment_entry || 0)}</span>
-                      </div>
-                    )}
+                    {property.unit_type === 'rental' ? (
+                      <>
+                        {property.cub_monthly_rate > 0 && (
+                          <div className="flex justify-between items-center py-2 border-b border-outline-variant/10">
+                            <span className="text-base text-on-surface-variant">Condomínio (Estimado)</span>
+                            <span className="text-xl font-bold text-on-surface">{formatCurrency(property.cub_monthly_rate || 0)}</span>
+                          </div>
+                        )}
+                        {property.payment_entry > 0 && (
+                          <div className="flex justify-between items-center py-2 border-b border-outline-variant/10">
+                            <span className="text-base text-on-surface-variant">IPTU (Mensal)</span>
+                            <span className="text-xl font-bold text-on-surface">{formatCurrency(property.payment_entry || 0)}</span>
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <>
+                        {property.payment_entry > 0 && (
+                          <div className="flex justify-between items-center py-2 border-b border-outline-variant/10">
+                            <span className="text-base text-on-surface-variant">Entrada</span>
+                            <span className="text-xl font-bold text-on-surface">{formatCurrency(property.payment_entry || 0)}</span>
+                          </div>
+                        )}
 
-                    {property.payment_installment_count > 0 && property.payment_installment_value > 0 && (
-                      <div className="flex justify-between items-center py-2 border-b border-outline-variant/10">
-                        <span className="text-base text-on-surface-variant">{property.payment_installment_count}x Mensais</span>
-                        <span className="text-xl font-bold text-on-surface">{formatCurrency(property.payment_installment_value || 0)}</span>
-                      </div>
-                    )}
+                        {property.payment_installment_count > 0 && property.payment_installment_value > 0 && (
+                          <div className="flex justify-between items-center py-2 border-b border-outline-variant/10">
+                            <span className="text-base text-on-surface-variant">{property.payment_installment_count}x Mensais</span>
+                            <span className="text-xl font-bold text-on-surface">{formatCurrency(property.payment_installment_value || 0)}</span>
+                          </div>
+                        )}
 
-                    {property.payment_reinforcement_count > 0 && property.payment_reinforcement_value > 0 && (
-                      <div className="flex justify-between items-center py-2 border-b border-outline-variant/10">
-                        <span className="text-base text-on-surface-variant">{property.payment_reinforcement_count}x Reforços</span>
-                        <span className="text-xl font-bold text-on-surface">{formatCurrency(property.payment_reinforcement_value || 0)}</span>
-                      </div>
-                    )}
+                        {!isStandaloneProperty && property.payment_reinforcement_count > 0 && property.payment_reinforcement_value > 0 && (
+                          <div className="flex justify-between items-center py-2 border-b border-outline-variant/10">
+                            <span className="text-base text-on-surface-variant">{property.payment_reinforcement_count}x Reforços</span>
+                            <span className="text-xl font-bold text-on-surface">{formatCurrency(property.payment_reinforcement_value || 0)}</span>
+                          </div>
+                        )}
 
-                    {property.payment_post_construction > 0 && (
-                      <div className="flex justify-between items-center py-2 border-b border-outline-variant/10">
-                        <span className="text-base text-on-surface-variant">Saldo Pós-Obra</span>
-                        <span className="text-xl font-bold text-on-surface">{formatCurrency(property.payment_post_construction || 0)}</span>
-                      </div>
+                        {property.payment_post_construction > 0 && (
+                          <div className="flex justify-between items-center py-2 border-b border-outline-variant/10">
+                            <span className="text-base text-on-surface-variant">{isStandaloneProperty ? 'Financiamento Bancário' : 'Saldo Pós-Obra'}</span>
+                            <span className="text-xl font-bold text-on-surface">{formatCurrency(property.payment_post_construction || 0)}</span>
+                          </div>
+                        )}
+                      </>
                     )}
                   </div>
                 </div>
               </section>
             )}
 
-            {showPaymentPlan && (property.roi_appreciation_1y > 0 || property.rent_annual > 0 || property.rent_seasonal > 0 || property.sale_value_after_keys > 0 || property.cub_monthly_rate > 0) && (
+            {showPaymentPlan && property.unit_type !== 'rental' && (property.roi_appreciation_1y > 0 || property.rent_annual > 0 || property.rent_seasonal > 0 || property.sale_value_after_keys > 0 || property.cub_monthly_rate > 0) && (
               <section className="bg-gradient-to-br from-emerald-900 via-emerald-800 to-teal-900 p-[2px] rounded-2xl shadow-2xl relative overflow-hidden group">
                 {/* Efeito Ouro Premium */}
                 <div className="absolute inset-0 bg-gradient-to-tr from-yellow-400/20 via-transparent to-yellow-400/20 opacity-0 group-hover:opacity-100 transition-opacity duration-700"></div>
@@ -876,34 +897,36 @@ export const PropertyDetails = () => {
                     </div>
                   </div>
                   
-                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                  <div className={`grid grid-cols-1 ${!isStandaloneProperty ? 'lg:grid-cols-3' : 'lg:grid-cols-1'} gap-6`}>
                     {/* Card Valorização */}
-                    <div className="bg-surface-container-high rounded-xl p-6 border border-emerald-500/10 hover:border-emerald-500/30 transition-all shadow-sm relative overflow-hidden group/card">
-                      <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/5 rounded-bl-[100px] transition-transform group-hover/card:scale-110"></div>
-                      <h3 className="text-[10px] font-black text-on-surface-variant uppercase tracking-[0.2em] mb-6 flex items-center gap-2">
-                        <span className="material-symbols-outlined text-[18px] text-emerald-500">trending_up</span> Valorização
-                      </h3>
-                      <div className="space-y-4 relative z-10">
-                        {property.roi_appreciation_1y > 0 && (
-                          <div className="flex justify-between items-end">
-                            <span className="text-sm font-bold text-on-surface-variant">Em 1 Ano:</span>
-                            <span className="font-black text-3xl text-emerald-600 tracking-tighter">+{property.roi_appreciation_1y}%</span>
-                          </div>
-                        )}
-                        {property.roi_appreciation_2y > 0 && (
-                          <div className="flex justify-between items-end border-t border-outline-variant/10 pt-3">
-                            <span className="text-xs font-bold text-on-surface-variant">Em 2 Anos:</span>
-                            <span className="font-black text-xl text-emerald-600/80">+{property.roi_appreciation_2y}%</span>
-                          </div>
-                        )}
-                        {property.roi_appreciation_3y > 0 && (
-                          <div className="flex justify-between items-end border-t border-outline-variant/10 pt-3">
-                            <span className="text-xs font-bold text-on-surface-variant">Em 3 Anos:</span>
-                            <span className="font-black text-xl text-emerald-600/80">+{property.roi_appreciation_3y}%</span>
-                          </div>
-                        )}
+                    {!isStandaloneProperty && (
+                      <div className="bg-surface-container-high rounded-xl p-6 border border-emerald-500/10 hover:border-emerald-500/30 transition-all shadow-sm relative overflow-hidden group/card">
+                        <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/5 rounded-bl-[100px] transition-transform group-hover/card:scale-110"></div>
+                        <h3 className="text-[10px] font-black text-on-surface-variant uppercase tracking-[0.2em] mb-6 flex items-center gap-2">
+                          <span className="material-symbols-outlined text-[18px] text-emerald-500">trending_up</span> Valorização
+                        </h3>
+                        <div className="space-y-4 relative z-10">
+                          {property.roi_appreciation_1y > 0 && (
+                            <div className="flex justify-between items-end">
+                              <span className="text-sm font-bold text-on-surface-variant">Em 1 Ano:</span>
+                              <span className="font-black text-3xl text-emerald-600 tracking-tighter">+{property.roi_appreciation_1y}%</span>
+                            </div>
+                          )}
+                          {property.roi_appreciation_2y > 0 && (
+                            <div className="flex justify-between items-end border-t border-outline-variant/10 pt-3">
+                              <span className="text-xs font-bold text-on-surface-variant">Em 2 Anos:</span>
+                              <span className="font-black text-xl text-emerald-600/80">+{property.roi_appreciation_2y}%</span>
+                            </div>
+                          )}
+                          {property.roi_appreciation_3y > 0 && (
+                            <div className="flex justify-between items-end border-t border-outline-variant/10 pt-3">
+                              <span className="text-xs font-bold text-on-surface-variant">Em 3 Anos:</span>
+                              <span className="font-black text-xl text-emerald-600/80">+{property.roi_appreciation_3y}%</span>
+                            </div>
+                          )}
+                        </div>
                       </div>
-                    </div>
+                    )}
 
                     {/* Card Rentabilidade */}
                     <div className="bg-surface-container-high rounded-xl p-6 border border-amber-500/10 hover:border-amber-500/30 transition-all shadow-sm relative overflow-hidden group/card">
@@ -934,40 +957,42 @@ export const PropertyDetails = () => {
                     </div>
 
                     {/* Card Finalização */}
-                    <div className="bg-gradient-to-br from-emerald-800 to-emerald-950 rounded-xl p-6 text-emerald-50 relative overflow-hidden shadow-inner flex flex-col justify-between group/card">
-                      <div className="absolute -right-8 -bottom-8 opacity-10 transition-transform duration-700 group-hover/card:scale-150 group-hover/card:rotate-12">
-                        <span className="material-symbols-outlined text-[150px]">diamond</span>
-                      </div>
-                      
-                      <div>
-                        <h3 className="text-[10px] font-black text-emerald-300 uppercase tracking-[0.2em] mb-6 flex items-center gap-2 relative z-10">
-                          <span className="material-symbols-outlined text-[18px]">account_balance</span> Projeção nas Chaves
-                        </h3>
-                        <div className="space-y-4 relative z-10">
-                          {property.sale_value_after_keys > 0 && (
+                    {!isStandaloneProperty && (
+                      <div className="bg-gradient-to-br from-emerald-800 to-emerald-950 rounded-xl p-6 text-emerald-50 relative overflow-hidden shadow-inner flex flex-col justify-between group/card">
+                        <div className="absolute -right-8 -bottom-8 opacity-10 transition-transform duration-700 group-hover/card:scale-150 group-hover/card:rotate-12">
+                          <span className="material-symbols-outlined text-[150px]">diamond</span>
+                        </div>
+                        
+                        <div>
+                          <h3 className="text-[10px] font-black text-emerald-300 uppercase tracking-[0.2em] mb-6 flex items-center gap-2 relative z-10">
+                            <span className="material-symbols-outlined text-[18px]">account_balance</span> Projeção nas Chaves
+                          </h3>
+                          <div className="space-y-4 relative z-10">
+                            {property.sale_value_after_keys > 0 && !isStandaloneProperty && (
+                              <div className="flex flex-col gap-1">
+                                <span className="text-xs font-bold text-emerald-200/80">Venda Estimada:</span>
+                                <span className="font-black text-4xl text-white drop-shadow-md tracking-tighter">{formatCurrency(property.sale_value_after_keys)}</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4 border-t border-emerald-700/50 pt-4 mt-6 relative z-10 bg-black/10 p-3 rounded-lg backdrop-blur-sm">
+                          {property.cub_monthly_rate > 0 && !isStandaloneProperty && (
                             <div className="flex flex-col gap-1">
-                              <span className="text-xs font-bold text-emerald-200/80">Venda Estimada:</span>
-                              <span className="font-black text-4xl text-white drop-shadow-md tracking-tighter">{formatCurrency(property.sale_value_after_keys)}</span>
+                              <span className="text-[9px] uppercase tracking-widest text-emerald-300 font-bold">Reajuste CUB</span>
+                              <span className="font-black text-lg text-emerald-50">+{property.cub_monthly_rate}%<span className="text-[9px] font-normal"> a.m.</span></span>
+                            </div>
+                          )}
+                          {property.months_until_keys > 0 && !isStandaloneProperty && (
+                            <div className="flex flex-col gap-1">
+                              <span className="text-[9px] uppercase tracking-widest text-emerald-300 font-bold">Prazo Chaves</span>
+                              <span className="font-black text-lg text-emerald-50">{property.months_until_keys} m.</span>
                             </div>
                           )}
                         </div>
                       </div>
-
-                      <div className="grid grid-cols-2 gap-4 border-t border-emerald-700/50 pt-4 mt-6 relative z-10 bg-black/10 p-3 rounded-lg backdrop-blur-sm">
-                        {property.cub_monthly_rate > 0 && (
-                          <div className="flex flex-col gap-1">
-                            <span className="text-[9px] uppercase tracking-widest text-emerald-300 font-bold">Reajuste CUB</span>
-                            <span className="font-black text-lg text-emerald-50">+{property.cub_monthly_rate}%<span className="text-[9px] font-normal"> a.m.</span></span>
-                          </div>
-                        )}
-                        {property.months_until_keys > 0 && (
-                          <div className="flex flex-col gap-1">
-                            <span className="text-[9px] uppercase tracking-widest text-emerald-300 font-bold">Prazo Chaves</span>
-                            <span className="font-black text-lg text-emerald-50">{property.months_until_keys} m.</span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
+                    )}
                   </div>
                   
                   <div className="mt-10 pt-6 border-t border-outline-variant/10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">

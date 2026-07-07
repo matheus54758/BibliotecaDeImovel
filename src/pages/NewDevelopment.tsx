@@ -71,6 +71,8 @@ export const NewDevelopment = () => {
 
   const heroImageUrl = watch("hero_image_url");
   const priceStartingAt = watch("price_starting_at");
+  const currentType = watch("type");
+  const isRental = unitTypeFromUrl === "rental" || currentType === "rental";
 
   // Auto-calculate ROI based on price
   useEffect(() => {
@@ -211,6 +213,7 @@ export const NewDevelopment = () => {
 
           reset({
             ...propData,
+            type: propData.unit_type,
             street,
             city,
             state
@@ -307,7 +310,7 @@ export const NewDevelopment = () => {
         payment_reinforcement_value: data.payment_reinforcement_value || 0,
         payment_reinforcement_count: data.payment_reinforcement_count || 0,
         payment_post_construction: data.payment_post_construction || 0,
-        unit_type: data.type || "Imóvel",
+        unit_type: isRental ? "rental" : (data.type || "Imóvel"),
         has_garage: !!data.has_garage,
         near_beach: !!data.near_beach,
         has_deed: !!data.has_deed,
@@ -336,7 +339,7 @@ export const NewDevelopment = () => {
           .eq('id', id);
         
         if (devError) throw devError;
-        navigate(parentId ? `/units/${id}` : (isStandaloneProperty ? `/units/${id}` : `/projects/${id}`));
+        navigate(isRental ? `/rentals/${id}` : (parentId ? `/units/${id}` : (isStandaloneProperty ? `/units/${id}` : `/projects/${id}`)));
       } else {
         const { data: newData, error: devError } = await supabase
           .from('developments')
@@ -347,9 +350,9 @@ export const NewDevelopment = () => {
         
         if (newData && newData[0]) {
           const newItem = newData[0];
-          navigate(newItem.parent_id ? `/units/${newItem.id}` : (isStandaloneProperty ? `/units/${newItem.id}` : `/projects/${newItem.id}`));
+          navigate(isRental ? `/rentals/${newItem.id}` : (newItem.parent_id ? `/units/${newItem.id}` : (isStandaloneProperty ? `/units/${newItem.id}` : `/projects/${newItem.id}`)));
         } else {
-          navigate("/developments");
+          navigate(isRental ? "/rentals" : "/developments");
         }
       }
     } catch (error: any) {
@@ -388,25 +391,25 @@ export const NewDevelopment = () => {
       <h1 className="font-headline text-3xl font-bold text-on-surface mb-2 tracking-tight">
         {parentId 
           ? (isEditing ? "Editar Unidade" : "Nova Unidade") 
-          : (isStandaloneProperty ? (isEditing ? "Editar Imóvel" : "Novo Imóvel") : (isEditing ? "Editar Empreendimento" : "Novo Empreendimento"))
+          : (isRental ? (isEditing ? "Editar Aluguel" : "Novo Aluguel") : (isStandaloneProperty ? (isEditing ? "Editar Imóvel" : "Novo Imóvel") : (isEditing ? "Editar Empreendimento" : "Novo Empreendimento")))
         }
       </h1>
       <p className="font-body text-on-surface-variant mb-8 text-lg">
         {parentId 
           ? "Ajuste os detalhes específicos deste apartamento ou sala." 
-          : (isStandaloneProperty ? "Cadastre um imóvel pronto ou avulso com todos os detalhes." : "Configure as informações gerais do projeto arquitetônico.")
+          : (isRental ? "Cadastre os dados e valores do imóvel para locação." : (isStandaloneProperty ? "Cadastre um imóvel pronto ou avulso com todos os detalhes." : "Configure as informações gerais do projeto arquitetônico."))
         }
       </p>
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
         <div className="bg-surface-container-lowest rounded-xl p-8 sunken-shadow space-y-6">
           <h3 className="font-headline text-xl font-bold text-primary border-b border-surface-container-high pb-4">
-            {parentId ? "Informações da Unidade" : (isStandaloneProperty ? "Informações do Imóvel" : "Informações do Empreendimento")}
+            {parentId ? "Informações da Unidade" : (isRental ? "Informações do Imóvel para Aluguel" : (isStandaloneProperty ? "Informações do Imóvel" : "Informações do Empreendimento"))}
           </h3>
           
           <div className="space-y-8">
             <MediaUpload 
-              label={parentId || isStandaloneProperty ? "Imagem de Capa (Principal)" : "Imagem de Capa do Empreendimento"}
+              label={parentId || isStandaloneProperty || isRental ? "Imagem de Capa (Principal)" : "Imagem de Capa do Empreendimento"}
               onUpload={(url) => setValue("hero_image_url", Array.isArray(url) ? url[0] : url, { shouldValidate: true })}
               previewUrl={heroImageUrl || undefined}
               accept="image"
@@ -563,20 +566,38 @@ export const NewDevelopment = () => {
           </div>
         )}
 
-        {(parentId || isStandaloneProperty) && (
+        {(parentId || isStandaloneProperty || isRental) && (
           <div className="bg-surface-container-lowest rounded-xl p-8 sunken-shadow space-y-8">
             <h3 className="font-headline text-xl font-bold text-primary border-b border-surface-container-high pb-4">
-              Valores e Plano de Pagamento
+              {isRental ? "Valores do Aluguel" : "Valores e Plano de Pagamento"}
             </h3>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               <InputField 
-                label="Valor Total (R$)"
+                label={isRental ? "Valor do Aluguel (Mensal) (R$)" : "Valor Total (R$)"}
                 type="number"
                 step="0.01"
                 {...register("price_starting_at")}
-                placeholder="Ex: 550000"
+                placeholder={isRental ? "Ex: 2500" : "Ex: 550000"}
               />
+              {isRental && (
+                <InputField 
+                  label="Valor do Condomínio (R$)"
+                  type="number"
+                  step="0.01"
+                  {...register("cub_monthly_rate")}
+                  placeholder="Ex: 400"
+                />
+              )}
+              {isRental && (
+                <InputField 
+                  label="Valor do IPTU (Mensal) (R$)"
+                  type="number"
+                  step="0.01"
+                  {...register("payment_entry")}
+                  placeholder="Ex: 150"
+                />
+              )}
               <InputField 
                 label="Área Privativa (m²)"
                 type="number"
@@ -598,55 +619,61 @@ export const NewDevelopment = () => {
               />
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-outline-variant/10">
-              <InputField label="Valor de Entrada (R$)" type="number" step="0.01" {...register("payment_entry")} placeholder="Ex: 100000" />
-              {!isStandaloneProperty && (
-                <InputField label="Saldo Pós-Obra / Financiamento (R$)" type="number" step="0.01" {...register("payment_post_construction")} placeholder="Ex: 300000" />
-              )}
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-4 border-t border-outline-variant/10">
-              <div className="space-y-4">
-                <h4 className="font-bold text-primary flex items-center gap-2 text-sm uppercase tracking-wider">
-                  <span className="material-symbols-outlined text-sm">payments</span> Parcelas Mensais
-                </h4>
-                <div className="grid grid-cols-2 gap-4">
-                  <InputField label="Valor (R$)" type="number" step="0.01" {...register("payment_installment_value")} />
-                  <InputField label="Quantidade" type="number" {...register("payment_installment_count")} />
+            {!isRental && (
+              <>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-outline-variant/10">
+                  <InputField label="Valor de Entrada (R$)" type="number" step="0.01" {...register("payment_entry")} placeholder="Ex: 100000" />
+                  {!isStandaloneProperty && (
+                    <InputField label="Saldo Pós-Obra / Financiamento (R$)" type="number" step="0.01" {...register("payment_post_construction")} placeholder="Ex: 300000" />
+                  )}
                 </div>
-              </div>
 
-              {!isStandaloneProperty && (
-                <div className="space-y-4">
-                  <h4 className="font-bold text-primary flex items-center gap-2 text-sm uppercase tracking-wider">
-                    <span className="material-symbols-outlined text-sm">event_repeat</span> Reforços / Balões
-                  </h4>
-                  <div className="grid grid-cols-2 gap-4">
-                    <InputField label="Valor (R$)" type="number" step="0.01" {...register("payment_reinforcement_value")} />
-                    <InputField label="Quantidade" type="number" {...register("payment_reinforcement_count")} />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-4 border-t border-outline-variant/10">
+                  <div className="space-y-4">
+                    <h4 className="font-bold text-primary flex items-center gap-2 text-sm uppercase tracking-wider">
+                      <span className="material-symbols-outlined text-sm">payments</span> Parcelas Mensais
+                    </h4>
+                    <div className="grid grid-cols-2 gap-4">
+                      <InputField label="Valor (R$)" type="number" step="0.01" {...register("payment_installment_value")} />
+                      <InputField label="Quantidade" type="number" {...register("payment_installment_count")} />
+                    </div>
                   </div>
+
+                  {!isStandaloneProperty && (
+                    <div className="space-y-4">
+                      <h4 className="font-bold text-primary flex items-center gap-2 text-sm uppercase tracking-wider">
+                        <span className="material-symbols-outlined text-sm">event_repeat</span> Reforços / Balões
+                      </h4>
+                      <div className="grid grid-cols-2 gap-4">
+                        <InputField label="Valor (R$)" type="number" step="0.01" {...register("payment_reinforcement_value")} />
+                        <InputField label="Quantidade" type="number" {...register("payment_reinforcement_count")} />
+                      </div>
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
+              </>
+            )}
           </div>
         )}
 
-        {(parentId || isStandaloneProperty) && (
+        {(parentId || isStandaloneProperty) && !isRental && (
           <div className="bg-surface-container-lowest rounded-xl p-8 sunken-shadow space-y-8">
             <h3 className="font-headline text-xl font-bold text-primary border-b border-surface-container-high pb-4 flex items-center gap-2">
               <span className="material-symbols-outlined">trending_up</span>
               Projeções de Investimento e Retorno (ROI)
             </h3>
             
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="space-y-4">
-                <h4 className="font-bold text-primary flex items-center gap-2 text-sm uppercase tracking-wider">
-                  Valorização (Projeção)
-                </h4>
-                <InputField label="Em 1 Ano (%)" type="number" step="0.01" {...register("roi_appreciation_1y")} placeholder="Ex: 15" />
-                <InputField label="Em 2 Anos (%)" type="number" step="0.01" {...register("roi_appreciation_2y")} placeholder="Ex: 30" />
-                <InputField label="Em 3 Anos (%)" type="number" step="0.01" {...register("roi_appreciation_3y")} placeholder="Ex: 45" />
-              </div>
+            <div className={`grid grid-cols-1 ${!isStandaloneProperty ? 'md:grid-cols-3' : 'md:grid-cols-1'} gap-6`}>
+              {!isStandaloneProperty && (
+                <div className="space-y-4">
+                  <h4 className="font-bold text-primary flex items-center gap-2 text-sm uppercase tracking-wider">
+                    Valorização (Projeção)
+                  </h4>
+                  <InputField label="Em 1 Ano (%)" type="number" step="0.01" {...register("roi_appreciation_1y")} placeholder="Ex: 15" />
+                  <InputField label="Em 2 Anos (%)" type="number" step="0.01" {...register("roi_appreciation_2y")} placeholder="Ex: 30" />
+                  <InputField label="Em 3 Anos (%)" type="number" step="0.01" {...register("roi_appreciation_3y")} placeholder="Ex: 45" />
+                </div>
+              )}
 
               <div className="space-y-4">
                 <h4 className="font-bold text-primary flex items-center gap-2 text-sm uppercase tracking-wider">
@@ -654,16 +681,20 @@ export const NewDevelopment = () => {
                 </h4>
                 <InputField label="Rend. Temporada (R$/mês)" type="number" step="0.01" {...register("rent_seasonal")} />
                 <InputField label="Rend. Anual (R$/mês)" type="number" step="0.01" {...register("rent_annual")} />
-                <InputField label="Valor de Venda (Pós-Chaves) (R$)" type="number" step="0.01" {...register("sale_value_after_keys")} />
+                {!isStandaloneProperty && (
+                  <InputField label="Valor de Venda (Pós-Chaves) (R$)" type="number" step="0.01" {...register("sale_value_after_keys")} />
+                )}
               </div>
 
-              <div className="space-y-4">
-                <h4 className="font-bold text-primary flex items-center gap-2 text-sm uppercase tracking-wider">
-                  Correção e Entrega
-                </h4>
-                <InputField label="Reajuste CUB Mensal (%)" type="number" step="0.01" {...register("cub_monthly_rate")} placeholder="Ex: 0.5" />
-                <InputField label="Meses até Entrega da Chave" type="number" {...register("months_until_keys")} placeholder="Ex: 24" />
-              </div>
+              {!isStandaloneProperty && (
+                <div className="space-y-4">
+                  <h4 className="font-bold text-primary flex items-center gap-2 text-sm uppercase tracking-wider">
+                    Correção e Entrega
+                  </h4>
+                  <InputField label="Reajuste CUB Mensal (%)" type="number" step="0.01" {...register("cub_monthly_rate")} placeholder="Ex: 0.5" />
+                  <InputField label="Meses até Entrega da Chave" type="number" {...register("months_until_keys")} placeholder="Ex: 24" />
+                </div>
+              )}
             </div>
           </div>
         )}
