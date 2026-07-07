@@ -1,11 +1,10 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { supabase } from "../lib/supabase";
-import { Link, useSearchParams, useLocation } from "react-router-dom";
+import { Link } from "react-router-dom";
 
 export const Rentals = () => {
   const { t } = useTranslation();
-  const location = useLocation();
   const [rentals, setRentals] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
