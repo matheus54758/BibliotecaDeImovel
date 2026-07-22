@@ -95,13 +95,7 @@ export const Developments = () => {
               {isProjectsView ? t('developments.new_project') : t('developments.new_asset')}
             </button>
           </Link>
-          {(builderId || isProjectsView) && (
-            <Link to="/developments">
-              <button className="flex-1 md:flex-none bg-surface-container-high text-primary font-body font-medium py-2.5 px-6 rounded-lg hover:bg-surface-container-highest transition-colors flex items-center justify-center gap-2">
-                {t('common.show_all')}
-              </button>
-            </Link>
-          )}
+
         </div>
       </section>
 
