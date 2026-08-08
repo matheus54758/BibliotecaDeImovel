@@ -112,19 +112,44 @@ serve(async (req) => {
        zoneamento = zoneMatch[1];
     }
 
+    // Extraindo restrições ambientais
+    const restricoesAmbientais = [];
+    const lowerHtml = html.toLowerCase();
+    
+    if (lowerHtml.includes('preservação permanente') || lowerHtml.includes('app')) {
+      restricoesAmbientais.push('Área de Preservação Permanente (APP) identificada.');
+    }
+    if (lowerHtml.includes('curso d\'água') || lowerHtml.includes('hidrografia') || lowerHtml.includes('rio')) {
+      restricoesAmbientais.push('Proximidade com curso d\'água (Hidrografia).');
+    }
+    if (lowerHtml.includes('risco geológico') || lowerHtml.includes('deslizamento') || lowerHtml.includes('declividade')) {
+      restricoesAmbientais.push('Atenção: Área com possível risco geológico ou alta declividade.');
+    }
+    if (lowerHtml.includes('marinha') || lowerHtml.includes('terreno de marinha')) {
+      restricoesAmbientais.push('Possível sobreposição com Terreno de Marinha.');
+    }
+
+    // Tentar extrair o gabarito real (número de pavimentos)
+    const gabaritoMatch = html.match(/Gabarito.*?(\d+)\s*pavimento/is);
+    let gabaritoPavimentos = 6;
+    if (gabaritoMatch) {
+       gabaritoPavimentos = parseInt(gabaritoMatch[1], 10);
+    } else {
+       // Fallback baseado no zoneamento se o gabarito não for encontrado explicitamente
+       if (zoneamento.includes('AMC')) gabaritoPavimentos = 12;
+       else if (zoneamento.includes('ARP')) gabaritoPavimentos = 4;
+    }
+
     // Calculando CA (Mapeamento básico)
     let coeficienteAproveitamento = 2.5; 
     let taxaOcupacao = 50;
-    let gabaritoPavimentos = 6;
 
     if (zoneamento.includes('AMC')) {
        coeficienteAproveitamento = 4.0;
        taxaOcupacao = 70;
-       gabaritoPavimentos = 12;
     } else if (zoneamento.includes('ARP')) {
-       coeficienteAproveitamento = 2.5; // Ajustar conforme lei específica
+       coeficienteAproveitamento = 2.5;
        taxaOcupacao = 50;
-       gabaritoPavimentos = 4;
     }
 
     const result = {
@@ -135,6 +160,7 @@ serve(async (req) => {
       coeficienteAproveitamento,
       gabaritoPavimentos,
       areaMaximaConstruivel: areaLote * coeficienteAproveitamento,
+      restricoesAmbientais,
       potencialAdicional: 'Dados extraídos em tempo real do GeoFloripa!',
     }
 
