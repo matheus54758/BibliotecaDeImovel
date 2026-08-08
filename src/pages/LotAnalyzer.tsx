@@ -31,7 +31,7 @@ export const LotAnalyzer = () => {
 
   // Lógica de cálculo da viabilidade econômica
   const calcularEconomia = () => {
-    if (!result) return { custo: 0, vgv: 0, lucro: 0, roi: 0, resumoUnidades: '' };
+    if (!result) return { custo: 0, vgv: 0, lucro: 0, roi: 0, resumoUnidades: '', tempoEstimadoMeses: 0, valorizacaoAnual: [] };
     
     let areaVendavel = result.areaMaximaConstruivel * 0.8; // 20% perda área comum
     let multiplicadorCusto = 1;
