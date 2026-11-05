@@ -105,19 +105,19 @@ export const InvestmentSimulatorModal = ({ isOpen, onClose, property }: Investme
           {/* Results (Right) */}
           <div className="w-full md:w-2/3 p-6 md:p-8 space-y-8 flex flex-col justify-center">
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
               
-              <div className="bg-surface-container-high p-6 rounded-2xl relative overflow-hidden group">
-                <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full -mr-16 -mt-16 transition-transform group-hover:scale-150"></div>
+              <div className="bg-surface-container-high p-5 sm:p-6 rounded-2xl relative overflow-hidden group">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full -mr-16 -mt-16 transition-transform group-hover:scale-150 pointer-events-none"></div>
                 <p className="text-xs uppercase tracking-widest text-on-surface/50 font-bold mb-1 relative z-10">Total Desembolsado</p>
-                <p className="text-3xl font-black text-on-surface relative z-10">{formatCurrency(totalInvested)}</p>
+                <p className="text-xl sm:text-2xl lg:text-3xl font-black text-on-surface relative z-10 break-words">{formatCurrency(totalInvested)}</p>
                 <p className="text-xs text-on-surface/50 mt-2 relative z-10">Entrada + Parcelas corrigidas</p>
               </div>
 
-              <div className="bg-emerald-900 p-6 rounded-2xl relative overflow-hidden group shadow-lg shadow-emerald-900/20">
-                <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/20 rounded-full -mr-16 -mt-16 transition-transform group-hover:scale-150"></div>
+              <div className="bg-emerald-900 p-5 sm:p-6 rounded-2xl relative overflow-hidden group shadow-lg shadow-emerald-900/20">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/20 rounded-full -mr-16 -mt-16 transition-transform group-hover:scale-150 pointer-events-none"></div>
                 <p className="text-xs uppercase tracking-widest text-emerald-300 font-bold mb-1 relative z-10">Lucro Bruto Projetado</p>
-                <p className="text-3xl font-black text-white relative z-10">{formatCurrency(grossProfit)}</p>
+                <p className="text-xl sm:text-2xl lg:text-3xl font-black text-white relative z-10 break-words">{formatCurrency(grossProfit)}</p>
                 <p className="text-xs text-emerald-200 mt-2 relative z-10">Na venda (Chaves)</p>
               </div>
 

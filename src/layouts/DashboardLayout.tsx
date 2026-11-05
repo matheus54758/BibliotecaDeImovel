@@ -8,7 +8,7 @@ export const DashboardLayout = () => {
       <SideNavBar />
       <div className="md:ml-64">
         <TopNavBar />
-        <main className="pt-24 px-8 pb-12 min-h-screen">
+        <main className="pt-24 px-4 sm:px-6 xl:px-8 pb-12 min-h-screen">
           <Outlet />
         </main>
       </div>

@@ -14,6 +14,8 @@ export const Branding = () => {
     banner_url: theme.banner_url || "",
     about_me: (theme as any).about_me || "",
     slug: (theme as any).slug || "",
+    facebook_pixel_id: (theme as any).facebook_pixel_id || "",
+    google_analytics_id: (theme as any).google_analytics_id || "",
   });
 
   const handleSave = async (e: React.FormEvent) => {
@@ -39,7 +41,9 @@ export const Branding = () => {
             primary_color: formData.primary_color,
             banner_url: formData.banner_url,
             about_me: formData.about_me,
-            slug: formData.slug
+            slug: formData.slug,
+            facebook_pixel_id: formData.facebook_pixel_id,
+            google_analytics_id: formData.google_analytics_id
           },
           slug: formData.slug || null
         })
@@ -153,6 +157,32 @@ export const Branding = () => {
               previewUrl={formData.banner_url}
               accept="image"
             />
+          </div>
+          
+          <div className="bg-surface-container-lowest p-6 rounded-3xl sunken-shadow border border-outline-variant/10 space-y-6">
+            <h3 className="text-xl font-headline font-bold text-primary flex items-center gap-2">
+              <span className="material-symbols-outlined">monitoring</span>
+              Marketing e Rastreamento
+            </h3>
+            
+            <p className="text-sm text-on-surface-variant leading-relaxed">
+              Adicione as tags de rastreamento para otimizar suas campanhas de tráfego pago. Estes scripts serão injetados automaticamente na sua Vitrine Pública e na página de visualização dos seus imóveis.
+            </p>
+
+            <div className="space-y-4">
+              <InputField 
+                label="ID do Pixel do Facebook (Meta)"
+                value={formData.facebook_pixel_id}
+                onChange={(e) => setFormData({...formData, facebook_pixel_id: e.target.value})}
+                placeholder="Ex: 123456789012345"
+              />
+              <InputField 
+                label="ID de Mensuração do Google Analytics"
+                value={formData.google_analytics_id}
+                onChange={(e) => setFormData({...formData, google_analytics_id: e.target.value})}
+                placeholder="Ex: G-XXXXXXXXXX"
+              />
+            </div>
           </div>
 
           <div className="flex justify-end">

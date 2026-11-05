@@ -105,14 +105,14 @@ export const Rentals = () => {
                       : 'Disponível'}
                   </div>
                 </div>
-                <div className="p-6 relative">
-                  <div className="absolute -top-12 left-6 right-6 glass-panel rounded-lg p-4 sunken-shadow flex justify-between items-end">
-                    <div>
-                      <p className="text-xs font-bold text-primary uppercase tracking-wider mb-1">{rental.location}</p>
-                      <h3 className="text-xl font-headline font-bold text-on-background">{rental.title}</h3>
+                <div className="p-6 pt-0 relative">
+                  <div className="-mt-12 relative z-10 glass-panel rounded-lg p-4 sunken-shadow flex justify-between items-end mb-4">
+                    <div className="min-w-0">
+                      <p className="text-xs font-bold text-primary uppercase tracking-wider mb-1 break-words">{rental.location}</p>
+                      <h3 className="text-lg sm:text-xl font-headline font-bold text-on-background break-words">{rental.title}</h3>
                     </div>
                   </div>
-                  <div className="pt-8 mt-4 flex items-center justify-between">
+                  <div className="flex flex-wrap items-center justify-between gap-2 pt-2">
                     <span className="text-sm font-bold text-on-surface-variant uppercase tracking-wider">Valor Mensal</span>
                     <span className="text-lg font-black text-primary">
                       {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(rental.rent_annual / 12 || rental.price_starting_at || 0)}

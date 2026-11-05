@@ -172,10 +172,10 @@ export const Consultancy = () => {
 
       {/* Filters Section */}
       <section className="bg-surface-container-lowest p-6 rounded-2xl sunken-shadow mb-12 space-y-8 mx-4 md:mx-0">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-end">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-6 items-end">
           {/* Price Filter */}
-          <div className="lg:col-span-2 space-y-2">
-            <label className="block text-sm font-label font-bold text-on-surface uppercase tracking-wider">
+          <div className="lg:col-span-3 space-y-2">
+            <label className="block text-xs font-label font-bold text-on-surface uppercase tracking-wider">
               Preço Máximo
             </label>
             <input
@@ -188,8 +188,8 @@ export const Consultancy = () => {
           </div>
 
           {/* Area Filter */}
-          <div className="lg:col-span-2 space-y-2">
-            <label className="block text-sm font-label font-bold text-on-surface uppercase tracking-wider">
+          <div className="lg:col-span-3 space-y-2">
+            <label className="block text-xs font-label font-bold text-on-surface uppercase tracking-wider">
               Área Mínima (m²)
             </label>
             <input
@@ -202,8 +202,8 @@ export const Consultancy = () => {
           </div>
 
           {/* Status Filter */}
-          <div className="lg:col-span-4 space-y-2">
-            <label className="block text-sm font-label font-bold text-on-surface uppercase tracking-wider">
+          <div className="sm:col-span-2 lg:col-span-6 space-y-2">
+            <label className="block text-xs font-label font-bold text-on-surface uppercase tracking-wider">
               Status da Unidade
             </label>
             <div className="flex flex-wrap gap-2">
@@ -229,7 +229,7 @@ export const Consultancy = () => {
           </div>
 
           {/* Type Filters */}
-          <div className="lg:col-span-8 space-y-6">
+          <div className="sm:col-span-2 lg:col-span-12 grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-surface-container-high">
             <div className="space-y-2">
               <label className="block text-[10px] font-black uppercase tracking-widest text-on-surface-variant">
                 Tipo de Imóvel / Unidade

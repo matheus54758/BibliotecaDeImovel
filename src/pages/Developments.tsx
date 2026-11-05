@@ -133,15 +133,12 @@ export const Developments = () => {
                     }
                   </div>
                 </div>
-                <div className="p-6 relative">
-                  <div className="absolute -top-12 left-6 right-6 glass-panel rounded-lg p-4 sunken-shadow flex justify-between items-end">
-                    <div>
-                      <p className="text-xs font-bold text-primary uppercase tracking-wider mb-1">{dev.location}</p>
-                      <h3 className="text-xl font-headline font-bold text-on-background">{dev.title}</h3>
+                <div className="p-6 pt-0 relative">
+                  <div className="-mt-12 relative z-10 glass-panel rounded-lg p-4 sunken-shadow flex justify-between items-end">
+                    <div className="min-w-0">
+                      <p className="text-xs font-bold text-primary uppercase tracking-wider mb-1 break-words">{dev.location}</p>
+                      <h3 className="text-lg sm:text-xl font-headline font-bold text-on-background break-words">{dev.title}</h3>
                     </div>
-                  </div>
-                  <div className="pt-8 mt-4">
-                    {/* Espaçador para manter o design consistente após remover as métricas */}
                   </div>
                 </div>
               </article>

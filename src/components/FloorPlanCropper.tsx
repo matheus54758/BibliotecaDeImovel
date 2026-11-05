@@ -22,22 +22,36 @@ export const FloorPlanCropper: React.FC<FloorPlanCropperProps> = ({ pdfUrl, init
   const [croppedImages, setCroppedImages] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const cropperRef = useRef<ReactCropperElement>(null);
+  const pdfDocRef = useRef<pdfjs.PDFDocumentProxy | null>(null);
 
   useEffect(() => {
-    loadPdf();
+    setCurrentPage(initialPage);
+  }, [initialPage]);
+
+  useEffect(() => {
+    loadPdf(initialPage);
+    return () => {
+      (pdfDocRef.current as any)?.destroy?.();
+      pdfDocRef.current = null;
+    };
   }, [pdfUrl]);
 
   useEffect(() => {
-    renderPage(currentPage);
+    if (pdfDocRef.current) {
+      renderPage(currentPage);
+    }
   }, [currentPage]);
 
-  async function loadPdf() {
+  async function loadPdf(targetPage: number) {
     setLoading(true);
     try {
       const loadingTask = pdfjs.getDocument({ url: pdfUrl });
       const pdf = await loadingTask.promise;
+      pdfDocRef.current = pdf;
       setNumPages(pdf.numPages);
-      await renderPage(1);
+      const validPage = Math.min(Math.max(1, targetPage), pdf.numPages);
+      setCurrentPage(validPage);
+      await renderPage(validPage, pdf);
     } catch (error) {
       console.error("Error loading PDF:", error);
     } finally {
@@ -45,10 +59,11 @@ export const FloorPlanCropper: React.FC<FloorPlanCropperProps> = ({ pdfUrl, init
     }
   }
 
-  async function renderPage(pageNumber: number) {
+  async function renderPage(pageNumber: number, docInstance?: pdfjs.PDFDocumentProxy) {
+    const pdf = docInstance || pdfDocRef.current;
+    if (!pdf) return;
+    setLoading(true);
     try {
-      const loadingTask = pdfjs.getDocument({ url: pdfUrl });
-      const pdf = await loadingTask.promise;
       const page = await pdf.getPage(pageNumber);
       
       const viewport = page.getViewport({ scale: 2.0 }); // High scale for better crop quality
@@ -63,6 +78,8 @@ export const FloorPlanCropper: React.FC<FloorPlanCropperProps> = ({ pdfUrl, init
       }
     } catch (error) {
       console.error("Error rendering page:", error);
+    } finally {
+      setLoading(false);
     }
   }
 

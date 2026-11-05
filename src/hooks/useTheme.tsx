@@ -5,6 +5,8 @@ interface ThemeConfig {
   primary_color: string;
   banner_url: string | null;
   company_name: string | null;
+  facebook_pixel_id?: string | null;
+  google_analytics_id?: string | null;
 }
 
 interface ThemeContextType {

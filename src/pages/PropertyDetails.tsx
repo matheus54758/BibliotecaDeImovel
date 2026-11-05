@@ -30,6 +30,7 @@ export const PropertyDetails = () => {
   const [deleting, setDeleting] = useState(false);
   const [selectedMedia, setSelectedMedia] = useState<{url: string, type: 'image' | 'video'} | null>(null);
   const [processingPdf, setProcessingPdf] = useState(false);
+  const [pdfProgress, setPdfProgress] = useState<{ percent: number; message: string }>({ percent: 0, message: "" });
   const [selling, setSelling] = useState(false);
   const [updateReport, setUpdateReport] = useState<{
     unit: string;
@@ -46,12 +47,13 @@ export const PropertyDetails = () => {
   const [bulkProcessing, setBulkProcessing] = useState(false);
   const [isFloorPlanModalOpen, setIsFloorPlanModalOpen] = useState(false);
   const [isSimulatorOpen, setIsSimulatorOpen] = useState(false);
+  const [isAdModalOpen, setIsAdModalOpen] = useState(false);
   const [processingFloorPlanPdf, setProcessingFloorPlanPdf] = useState(false);
   const [floorPlansExtracted, setFloorPlansExtracted] = useState<any[]>([]);
   const [extractionProgress, setExtractionProgress] = useState({ current: 0, total: 0, message: "" });
   const [floorPlanPdfUrl, setFloorPlanPdfUrl] = useState<string | null>(null);
   const [activePlanToCrop, setActivePlanToCrop] = useState<any>(null);
-  const [croppedImagesToAssociate, setCroppedImagesToAssociate] = useState<{name: string, dataUrl: string} | null>(null);
+  const [croppedImagesToAssociate, setCroppedImagesToAssociate] = useState<{name: string, dataUrls: string[]} | null>(null);
   const [associationSelectedUnits, setAssociationSelectedUnits] = useState<string[]>([]);
   const [isAssociating, setIsAssociating] = useState(false);
 
@@ -157,36 +159,42 @@ export const PropertyDetails = () => {
   };
 
   const handleAssociateImageToUnits = async () => {
-    if (!croppedImagesToAssociate || associationSelectedUnits.length === 0) return;
+    if (!croppedImagesToAssociate || croppedImagesToAssociate.dataUrls.length === 0 || associationSelectedUnits.length === 0) return;
     setIsAssociating(true);
     
     try {
-      const res = await fetch(croppedImagesToAssociate.dataUrl);
-      const blob = await res.blob();
-      const fileName = `${id}/${Date.now()}-plan.jpg`;
-      
-      const { error: uploadError } = await supabase.storage
-        .from('assets')
-        .upload(fileName, blob, { contentType: 'image/jpeg' });
+      const uploadedUrls: string[] = [];
+
+      for (let i = 0; i < croppedImagesToAssociate.dataUrls.length; i++) {
+        const res = await fetch(croppedImagesToAssociate.dataUrls[i]);
+        const blob = await res.blob();
+        const fileName = `${id}/${Date.now()}-${i}-plan.jpg`;
         
-      if (uploadError) throw uploadError;
-      
-      const { data: { publicUrl } } = supabase.storage
-        .from('assets')
-        .getPublicUrl(fileName);
+        const { error: uploadError } = await supabase.storage
+          .from('assets')
+          .upload(fileName, blob, { contentType: 'image/jpeg' });
+          
+        if (uploadError) throw uploadError;
+        
+        const { data: { publicUrl } } = supabase.storage
+          .from('assets')
+          .getPublicUrl(fileName);
+          
+        uploadedUrls.push(publicUrl);
+      }
         
       for (const unitId of associationSelectedUnits) {
         const unit = subUnits.find(u => u.id === unitId);
         if (unit) {
           const currentUrls = unit.floor_plan_url || [];
           await supabase.from('developments').update({
-            floor_plan_url: [...currentUrls, publicUrl]
+            floor_plan_url: [...currentUrls, ...uploadedUrls]
           }).eq('id', unitId);
         }
       }
       
       fetchSubUnits();
-      alert("Planta associada com sucesso!");
+      alert(uploadedUrls.length > 1 ? `${uploadedUrls.length} plantas associadas com sucesso!` : "Planta associada com sucesso!");
       setCroppedImagesToAssociate(null);
       setAssociationSelectedUnits([]);
       
@@ -349,41 +357,132 @@ export const PropertyDetails = () => {
     }
 
     setProcessingPdf(true);
+    setPdfProgress({ percent: 5, message: "Carregando arquivo PDF..." });
+    let aiProgressInterval: ReturnType<typeof setInterval> | null = null;
+
     try {
       // Lendo o PDF no navegador usando pdfjsLib para evitar timeout no servidor
       const arrayBuffer = await file.arrayBuffer();
       const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) }).promise;
       let extractedText = "";
-      
+      const seenPageSignatures = new Set<string>();
+
       for (let i = 1; i <= pdf.numPages; i++) {
+        const pagePercent = 5 + Math.round((i / pdf.numPages) * 25); // 5% -> 30%
+        setPdfProgress({
+          percent: pagePercent,
+          message: `Lendo e alinhando página ${i} de ${pdf.numPages}...`
+        });
+
         const page = await pdf.getPage(i);
         const textContent = await page.getTextContent();
-        
-        let lastY = -1;
+
+        // Agrupar itens por linha visual usando tolerância no eixo Y (3.5px) e ordenar por X (esquerda -> direita)
+        const rows: { y: number; items: { x: number; str: string }[] }[] = [];
+        const Y_TOLERANCE = 3.5;
+
         textContent.items.forEach((item: any) => {
-          // Detecta mudança de linha baseado na coordenada Y
-          if (lastY !== item.transform[5]) {
-            extractedText += '\n';
-            lastY = item.transform[5];
+          const str = String(item.str || "").trim();
+          if (!str) return;
+          const x = Number(item.transform?.[4] || 0);
+          const y = Number(item.transform?.[5] || 0);
+
+          let row = rows.find(r => Math.abs(r.y - y) <= Y_TOLERANCE);
+          if (!row) {
+            row = { y, items: [] };
+            rows.push(row);
           }
-          // Adiciona o texto com espaçamento para preservar a tabela visual
-          extractedText += item.str + '  '; 
+          row.items.push({ x, str });
         });
-        extractedText += '\n\n---FIM DA PÁGINA---\n\n';
+
+        // Ordena linhas de cima para baixo (Y decrescente no sistema de coordenadas do PDF)
+        rows.sort((a, b) => b.y - a.y);
+
+        const pageLines = rows.map(row => {
+          row.items.sort((a, b) => a.x - b.x);
+          return row.items.map(it => it.str).join("   ");
+        });
+
+        const pageText = pageLines.join("\n").trim();
+
+        // Ignora páginas vazias ou que repetem apenas o cabeçalho (menos de 2 linhas ou idênticas a páginas anteriores)
+        if (pageLines.length <= 1 || seenPageSignatures.has(pageText)) {
+          continue;
+        }
+        seenPageSignatures.add(pageText);
+
+        extractedText += pageText + `\n\n---FIM DA PÁGINA ${i}---\n\n`;
       }
 
-      if (extractedText.trim().length === 0) {
-        alert("Não encontramos texto neste PDF. Certifique-se de que o documento não é apenas uma imagem escaneada sem texto selecionável.");
+      const cleanExtractedText = extractedText.replace(/---FIM DA PÁGINA \d+---/g, '').trim();
+      const pageImages: { index: number; base64: string; mimeType: string }[] = [];
+
+      // Fallback visual (OCR via IA) caso o PDF seja escaneado/imagem e não possua texto selecionável suficiente
+      if (cleanExtractedText.length < 30) {
+        console.log("PDF sem texto selecionável detectado. Renderizando páginas como imagem para leitura visual da IA...");
+        const maxVisualPages = Math.min(pdf.numPages, 15);
+        for (let i = 1; i <= maxVisualPages; i++) {
+          const ocrPercent = 15 + Math.round((i / maxVisualPages) * 20); // 15% -> 35%
+          setPdfProgress({
+            percent: ocrPercent,
+            message: `PDF escaneado detectado: renderizando página ${i} de ${maxVisualPages} para visão computacional...`
+          });
+
+          const page = await pdf.getPage(i);
+          const viewport = page.getViewport({ scale: 1.5 });
+          const canvas = document.createElement('canvas');
+          const context = canvas.getContext('2d');
+          if (context) {
+            canvas.width = viewport.width;
+            canvas.height = viewport.height;
+            await page.render({ canvasContext: context, viewport } as any).promise;
+            const base64 = canvas.toDataURL('image/jpeg', 0.8).split(',')[1];
+            pageImages.push({ index: i, base64, mimeType: 'image/jpeg' });
+          }
+        }
+      }
+
+      if (cleanExtractedText.length === 0 && pageImages.length === 0) {
+        alert("Não foi possível extrair texto nem renderizar as páginas deste PDF.");
         return;
       }
 
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("User not authenticated");
 
+      setPdfProgress({
+        percent: 35,
+        message: "Analisando tabela e extraindo unidades com Inteligência Artificial..."
+      });
+
+      // Avanço gradual de 35% até 78% enquanto aguarda a resposta da IA
+      aiProgressInterval = setInterval(() => {
+        setPdfProgress(prev => {
+          if (prev.percent >= 78) return prev;
+          const step = prev.percent < 60 ? 3 : 1;
+          const nextPercent = Math.min(78, prev.percent + step);
+          const nextMsg =
+            nextPercent < 55
+              ? "IA identificando colunas, áreas e condições de pagamento..."
+              : nextPercent < 70
+              ? "IA estruturando valores, vagas e status de cada unidade..."
+              : "Finalizando leitura inteligente da tabela...";
+          return { percent: nextPercent, message: nextMsg };
+        });
+      }, 600);
+
       const { data: extractedData, error: funcError } = await supabase.functions.invoke('process-pdf-units', {
-        body: JSON.stringify({ pdfText: extractedText }),
+        body: JSON.stringify({
+          pdfText: cleanExtractedText.length > 0 ? extractedText : undefined,
+          images: pageImages.length > 0 ? pageImages : undefined
+        }),
         headers: { 'Content-Type': 'application/json' }
       });
+
+      if (aiProgressInterval) {
+        clearInterval(aiProgressInterval);
+        aiProgressInterval = null;
+      }
 
       if (funcError) throw funcError;
       if (extractedData.error) throw new Error(extractedData.details || extractedData.error);
@@ -395,9 +494,14 @@ export const PropertyDetails = () => {
         return;
       }
 
+      setPdfProgress({
+        percent: 80,
+        message: `${extractedData.length} unidades identificadas! Normalizando valores e cálculos de ROI...`
+      });
+
       const cleanStatus = (s: any) => {
         const val = String(s || '').toLowerCase().replace(/[^a-z_]/g, '').trim();
-        if (val.includes('vend') || val.includes('sold')) return 'sold';
+        if (val.includes('vend') || val.includes('sold') || val.includes('indisp')) return 'sold';
         if (val.includes('unavail') || val.includes('reser')) return 'reserved';
         return 'available';
       };
@@ -433,40 +537,47 @@ export const PropertyDetails = () => {
           area = area / 100;
         }
 
-        let bedrooms = Number(unit.bedrooms);
-        if (isNaN(bedrooms) || bedrooms === 0) {
-          bedrooms = 1; 
-          // Se for studio, geralmente é 1 dormitório ou 0, mas o sistema espera >= 1 para alguns casos?
-          // Se unit_type for studio, bedrooms pode ser 1.
-          if (unit.unit_type === 'studio') bedrooms = 1;
-          else if (unit.description) {
-            const match = unit.description.match(/(\d+)\s*[Dd]/);
-            if (match) bedrooms = parseInt(match[1]);
-          }
-        }
-        bedrooms = Math.max(1, bedrooms);
-
         // Normalize unit_type to our standard keys
-        const normalizeType = (type: string, desc: string) => {
-          const combined = (String(type || '') + ' ' + String(desc || '')).toLowerCase();
+        const normalizeType = (type: string, desc: string, titleStr: string) => {
+          const combined = (String(type || '') + ' ' + String(desc || '') + ' ' + String(titleStr || '')).toLowerCase();
           if (combined.includes('sala') || combined.includes('comercial') || combined.includes('loja') || combined.includes('escritorio') || combined.includes('office')) return 'commercial';
-          if (combined.includes('studio') || combined.includes('kitnet')) return 'studio';
+          if (combined.includes('studio') || combined.includes('kitnet') || combined.includes('loft')) return 'studio';
           if (combined.includes('casa') || combined.includes('sobrado')) return 'house';
+          if (combined.includes('terreno') || combined.includes('lote')) return 'land';
           return 'dormitory';
         };
 
-        const finalType = normalizeType(unit.unit_type, unit.description);
+        const finalType = normalizeType(unit.unit_type, unit.description, unit.title);
+
+        let bedrooms = Number(unit.bedrooms);
+        if (isNaN(bedrooms) || bedrooms <= 0) {
+          if (finalType === 'commercial' || finalType === 'land') {
+            bedrooms = 0;
+          } else if (finalType === 'studio') {
+            bedrooms = 1;
+          } else {
+            const combinedText = `${unit.title || ''} ${unit.description || ''}`;
+            const match = combinedText.match(/(\d+)\s*(?:[Dd]|dorm|su[ií]te|quarto)/i);
+            bedrooms = match ? parseInt(match[1]) : 1;
+          }
+        }
         
-        const parking = Math.max(0, Number(unit.parking_spaces) || 0);
+        const combinedForFeatures = `${unit.title || ''} ${unit.description || ''}`.toLowerCase();
+        const isPenthouse = !!unit.is_penthouse || /\b(cob\.?|cobertura|duplex|triplex)\b/i.test(combinedForFeatures);
+        const hasRotativa = combinedForFeatures.includes('rotativa');
+        const parking = Math.max(hasRotativa ? 1 : 0, Number(unit.parking_spaces) || 0);
         const price = cleanNumber(unit.price_starting_at);
+        const baseTitle = String(unit.title || "Unidade")
+          .replace(/\s*\((VENDIDO|RESERVADO|INDISPONÍVEL)\)/gi, '')
+          .trim();
         
         return {
-          title: `${String(unit.title || "Unidade").trim()}${status === 'sold' ? ' (VENDIDO)' : status === 'reserved' ? ' (RESERVADO)' : ''}`,
+          title: `${baseTitle}${status === 'sold' ? ' (VENDIDO)' : status === 'reserved' ? ' (RESERVADO)' : ''}`,
           sq_ft: area,
           price_starting_at: price,
           status: status,
           bedrooms: bedrooms,
-          bathrooms: Math.max(1, Number(unit.bathrooms) || 0),
+          bathrooms: Math.max(1, Number(unit.bathrooms) || 1),
           parking_spaces: parking,
           unit_type: finalType,
           payment_entry: cleanNumber(unit.payment_entry),
@@ -494,7 +605,7 @@ export const PropertyDetails = () => {
           city: property.city,
           state: property.state,
           hero_image_url: property.hero_image_url,
-          is_penthouse: !!unit.is_penthouse,
+          is_penthouse: isPenthouse,
           has_sea_view: !!unit.has_sea_view,
           has_garage: !!unit.has_garage || parking > 0,
           is_furnished: !!unit.is_furnished,
@@ -507,63 +618,142 @@ export const PropertyDetails = () => {
 
       console.log("UNIDADES PREPARADAS PARA SALVAR:", unitsToInsert);
 
-      // 1. Buscar unidades existentes para comparação
+      // 1. Buscar unidades existentes para comparação inteligente (por título limpo ou código numérico da unidade)
       const { data: existingUnits } = await supabase
         .from('developments')
         .select('*')
         .eq('parent_id', id);
 
-      const existingMap = new Map();
+      const normalizeTitleKey = (t: string) =>
+        String(t || '')
+          .replace(/\s*\((VENDIDO|RESERVADO|INDISPONÍVEL)\)/gi, '')
+          .toLowerCase()
+          .replace(/\s+/g, ' ')
+          .trim();
+
+      // Extrai o identificador principal da unidade (ex: "Unidade 105 (Studio Norte)" -> "105", "Sala 01" -> "sala_1")
+      const extractUnitCode = (t: string) => {
+        const clean = normalizeTitleKey(t).replace(/\(.*?\)/g, '').trim();
+        const numMatch = clean.match(/\b(\d+[a-z]?)\b/i);
+        if (!numMatch) return null;
+        const numNormalized = numMatch[1].replace(/^0+(\d)/, '$1').toLowerCase();
+        const isCommercial = /\b(sala|loja|box)\b/i.test(clean);
+        return `${isCommercial ? 'com_' : 'unit_'}${numNormalized}`;
+      };
+
+      const existingByTitle = new Map<string, any>();
+      const existingByCode = new Map<string, any>();
+
       existingUnits?.forEach(u => {
-        const cleanTitle = u.title.replace(' (VENDIDO)', '').replace(' (RESERVADO)', '').trim();
-        existingMap.set(cleanTitle, u);
+        const key = normalizeTitleKey(u.title);
+        existingByTitle.set(key, u);
+        const code = extractUnitCode(u.title);
+        if (code && !existingByCode.has(code)) {
+          existingByCode.set(code, u);
+        }
       });
 
       const report: any[] = [];
-      let successCount = 0;
+      const toUpdate: { existing: any; unit: any }[] = [];
+      const toInsert: any[] = [];
+      const matchedExistingIds = new Set<string>();
 
       for (const unit of unitsToInsert) {
-        const cleanSearchTitle = unit.title.replace(' (VENDIDO)', '').replace(' (RESERVADO)', '').trim();
-        const existing = existingMap.get(cleanSearchTitle);
-
-        if (existing) {
-          // Comparar preços
-          const oldPrice = existing.price_starting_at || 0;
-          const newPrice = unit.price_starting_at || 0;
-
-          const { error: updError } = await supabase
-            .from('developments')
-            .update(unit)
-            .eq('id', existing.id);
-
-          if (!updError) {
-            successCount++;
-            report.push({
-              unit: unit.title,
-              oldPrice,
-              newPrice,
-              status: oldPrice === newPrice ? 'no_change' : 'updated'
-            });
-          } else {
-            report.push({ unit: unit.title, status: 'error', error: updError.message });
+        const titleKey = normalizeTitleKey(unit.title);
+        const codeKey = extractUnitCode(unit.title);
+        let existing = existingByTitle.get(titleKey);
+        if (!existing && codeKey) {
+          const candidate = existingByCode.get(codeKey);
+          if (candidate && !matchedExistingIds.has(candidate.id)) {
+            existing = candidate;
           }
+        }
+
+        if (existing && !matchedExistingIds.has(existing.id)) {
+          matchedExistingIds.add(existing.id);
+          // Se a unidade passou a ficar vendida/reservada com preço 0 no PDF mas já tinha preço no banco, preserva o preço anterior
+          if ((!unit.price_starting_at || unit.price_starting_at === 0) && existing.price_starting_at > 0) {
+            unit.price_starting_at = existing.price_starting_at;
+            unit.rent_seasonal = existing.price_starting_at * 0.01;
+            unit.rent_annual = existing.price_starting_at * 0.005;
+            unit.sale_value_after_keys = existing.price_starting_at * 1.30;
+          }
+          toUpdate.push({ existing, unit });
         } else {
-          // Inserir como novo
-          const { error: insError } = await supabase.from('developments').insert([unit]);
-          if (!insError) {
-            successCount++;
-            report.push({
-              unit: unit.title,
-              oldPrice: 0,
-              newPrice: unit.price_starting_at,
-              status: 'inserted'
-            });
-          } else {
-            report.push({ unit: unit.title, status: 'error', error: insError.message });
-          }
+          toInsert.push(unit);
         }
       }
 
+      const totalOps = toInsert.length + toUpdate.length;
+      let completedOps = 0;
+
+      // 2. Inserção em lote das novas unidades (muito mais rápido)
+      if (toInsert.length > 0) {
+        setPdfProgress({
+          percent: 85,
+          message: `Cadastrando ${toInsert.length} nova(s) unidade(s) em lote...`
+        });
+
+        const { error: batchInsertError } = await supabase.from('developments').insert(toInsert);
+        if (!batchInsertError) {
+          toInsert.forEach(u => {
+            report.push({
+              unit: u.title,
+              oldPrice: 0,
+              newPrice: u.price_starting_at,
+              status: 'inserted'
+            });
+          });
+        } else {
+          toInsert.forEach(u => {
+            report.push({
+              unit: u.title,
+              oldPrice: 0,
+              newPrice: u.price_starting_at,
+              status: 'error',
+              error: batchInsertError.message
+            });
+          });
+        }
+        completedOps += toInsert.length;
+      }
+
+      // 3. Atualização em lotes paralelos das unidades existentes com progresso em %
+      const CHUNK_SIZE = 10;
+      for (let i = 0; i < toUpdate.length; i += CHUNK_SIZE) {
+        const chunk = toUpdate.slice(i, i + CHUNK_SIZE);
+        const currentPercent = 85 + Math.round(((completedOps + chunk.length) / Math.max(1, totalOps)) * 14);
+        setPdfProgress({
+          percent: Math.min(99, currentPercent),
+          message: `Atualizando unidades existentes (${Math.min(i + chunk.length, toUpdate.length)} de ${toUpdate.length})...`
+        });
+
+        await Promise.all(
+          chunk.map(async ({ existing, unit }) => {
+            const oldPrice = existing.price_starting_at || 0;
+            const newPrice = unit.price_starting_at || 0;
+
+            const { error: updError } = await supabase
+              .from('developments')
+              .update(unit)
+              .eq('id', existing.id);
+
+            if (!updError) {
+              report.push({
+                unit: unit.title,
+                oldPrice,
+                newPrice,
+                status: oldPrice === newPrice ? 'no_change' : 'updated'
+              });
+            } else {
+              report.push({ unit: unit.title, oldPrice, newPrice, status: 'error', error: updError.message });
+            }
+          })
+        );
+        completedOps += chunk.length;
+      }
+
+      setPdfProgress({ percent: 100, message: "Processamento concluído com sucesso!" });
       setUpdateReport(report);
       fetchSubUnits();
     } catch (error: any) {
@@ -580,7 +770,9 @@ export const PropertyDetails = () => {
       
       alert(errorMessage);
     } finally {
+      if (aiProgressInterval) clearInterval(aiProgressInterval);
       setProcessingPdf(false);
+      setPdfProgress({ percent: 0, message: "" });
       if (e.target) e.target.value = '';
     }
   };
@@ -777,34 +969,34 @@ export const PropertyDetails = () => {
           
           <div className="space-y-8">
             {/* Descrição em Bloco Único e Amplo */}
-            <section className="bg-surface-container-lowest p-10 rounded-xl sunken-shadow min-h-[400px]">
-              <h2 className="text-2xl font-headline font-bold text-on-surface mb-8 tracking-tight border-b border-outline-variant/10 pb-4">
+            <section className="bg-surface-container-lowest p-6 sm:p-8 rounded-xl sunken-shadow">
+              <h2 className="text-2xl font-headline font-bold text-on-surface mb-6 tracking-tight border-b border-outline-variant/10 pb-4">
                 {isSubUnit ? "Sobre esta Unidade" : (isStandaloneProperty ? "Sobre este Imóvel" : "Sobre este Empreendimento")}
               </h2>
-              <div className="space-y-6 text-on-surface-variant leading-relaxed text-lg font-body">
-                <p className="whitespace-pre-wrap">{property.description}</p>
+              <div className="space-y-6 text-on-surface-variant leading-relaxed text-base sm:text-lg font-body">
+                <p className="whitespace-pre-wrap break-words">{property.description}</p>
                 {(isSubUnit || isStandaloneProperty) && (
-                <div className="grid grid-cols-3 gap-8 pt-10 border-t border-outline-variant/10">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 sm:gap-8 pt-6 sm:pt-8 border-t border-outline-variant/10">
                   <div className="flex flex-col">
                     <span className="text-xs uppercase text-on-surface-variant/60 font-bold tracking-widest mb-1">Área Total</span>
-                    <span className="text-2xl font-headline font-bold text-primary">{formatNumber(property.sq_ft)}m²</span>
+                    <span className="text-xl sm:text-2xl font-headline font-bold text-primary">{formatNumber(property.sq_ft)}m²</span>
                   </div>
                   {property.unit_type !== 'land' && (
                     <>
                       <div className="flex flex-col">
                         <span className="text-xs uppercase text-on-surface-variant/60 font-bold tracking-widest mb-1">Dormitórios</span>
-                        <span className="text-2xl font-headline font-bold text-primary">{property.bedrooms || 0}</span>
+                        <span className="text-xl sm:text-2xl font-headline font-bold text-primary">{property.bedrooms || 0}</span>
                       </div>
                       <div className="flex flex-col">
                         <span className="text-xs uppercase text-on-surface-variant/60 font-bold tracking-widest mb-1">Banheiros</span>
-                        <span className="text-2xl font-headline font-bold text-primary">{property.bathrooms || 0}</span>
+                        <span className="text-xl sm:text-2xl font-headline font-bold text-primary">{property.bathrooms || 0}</span>
                       </div>
                     </>
                   )}
                   {!isSubUnit && property.parking_spaces > 0 && property.unit_type !== 'land' && (
                     <div className="flex flex-col">
                       <span className="text-xs uppercase text-on-surface-variant/60 font-bold tracking-widest mb-1">Vagas</span>
-                      <span className="text-2xl font-headline font-bold text-primary">{property.parking_spaces}</span>
+                      <span className="text-xl sm:text-2xl font-headline font-bold text-primary">{property.parking_spaces}</span>
                     </div>
                   )}
                 </div>
@@ -813,59 +1005,59 @@ export const PropertyDetails = () => {
             </section>
 
             {showPaymentPlan && property.price_starting_at > 0 && (
-              <section className="bg-primary/5 p-10 rounded-xl border border-primary/10">
+              <section className="bg-primary/5 p-6 sm:p-8 rounded-xl border border-primary/10">
                 <h2 className="text-2xl font-headline font-bold text-primary mb-6 tracking-tight flex items-center gap-2">
                   <span className="material-symbols-outlined">payments</span> {property.unit_type === 'rental' ? 'Valores da Locação' : 'Plano de Pagamento'}
                 </h2>
                 <div className="space-y-6">
-                  <div className="flex justify-between items-center pb-4 border-b border-primary/10">
+                  <div className="flex flex-wrap justify-between items-baseline gap-2 pb-4 border-b border-primary/10">
                     <span className="text-sm font-bold text-on-surface-variant uppercase">{property.unit_type === 'rental' ? 'Aluguel Mensal' : 'Valor Total do Ativo'}</span>
-                    <span className="text-4xl font-headline font-black text-primary">{formatCurrency(property.price_starting_at || 0)}</span>
+                    <span className="text-2xl sm:text-3xl xl:text-4xl font-headline font-black text-primary break-words">{formatCurrency(property.price_starting_at || 0)}</span>
                   </div>
                   
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-6 pt-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4 pt-2">
                     {property.unit_type === 'rental' ? (
                       <>
                         {property.cub_monthly_rate > 0 && (
-                          <div className="flex justify-between items-center py-2 border-b border-outline-variant/10">
-                            <span className="text-base text-on-surface-variant">Condomínio (Estimado)</span>
-                            <span className="text-xl font-bold text-on-surface">{formatCurrency(property.cub_monthly_rate || 0)}</span>
+                          <div className="flex flex-wrap justify-between items-baseline gap-2 py-2 border-b border-outline-variant/10">
+                            <span className="text-sm sm:text-base text-on-surface-variant">Condomínio (Estimado)</span>
+                            <span className="text-lg sm:text-xl font-bold text-on-surface">{formatCurrency(property.cub_monthly_rate || 0)}</span>
                           </div>
                         )}
                         {property.payment_entry > 0 && (
-                          <div className="flex justify-between items-center py-2 border-b border-outline-variant/10">
-                            <span className="text-base text-on-surface-variant">IPTU (Mensal)</span>
-                            <span className="text-xl font-bold text-on-surface">{formatCurrency(property.payment_entry || 0)}</span>
+                          <div className="flex flex-wrap justify-between items-baseline gap-2 py-2 border-b border-outline-variant/10">
+                            <span className="text-sm sm:text-base text-on-surface-variant">IPTU (Mensal)</span>
+                            <span className="text-lg sm:text-xl font-bold text-on-surface">{formatCurrency(property.payment_entry || 0)}</span>
                           </div>
                         )}
                       </>
                     ) : (
                       <>
                         {property.payment_entry > 0 && (
-                          <div className="flex justify-between items-center py-2 border-b border-outline-variant/10">
-                            <span className="text-base text-on-surface-variant">Entrada</span>
-                            <span className="text-xl font-bold text-on-surface">{formatCurrency(property.payment_entry || 0)}</span>
+                          <div className="flex flex-wrap justify-between items-baseline gap-2 py-2 border-b border-outline-variant/10">
+                            <span className="text-sm sm:text-base text-on-surface-variant">Entrada</span>
+                            <span className="text-lg sm:text-xl font-bold text-on-surface">{formatCurrency(property.payment_entry || 0)}</span>
                           </div>
                         )}
 
                         {property.payment_installment_count > 0 && property.payment_installment_value > 0 && (
-                          <div className="flex justify-between items-center py-2 border-b border-outline-variant/10">
-                            <span className="text-base text-on-surface-variant">{property.payment_installment_count}x Mensais</span>
-                            <span className="text-xl font-bold text-on-surface">{formatCurrency(property.payment_installment_value || 0)}</span>
+                          <div className="flex flex-wrap justify-between items-baseline gap-2 py-2 border-b border-outline-variant/10">
+                            <span className="text-sm sm:text-base text-on-surface-variant">{property.payment_installment_count}x Mensais</span>
+                            <span className="text-lg sm:text-xl font-bold text-on-surface">{formatCurrency(property.payment_installment_value || 0)}</span>
                           </div>
                         )}
 
                         {!isStandaloneProperty && property.payment_reinforcement_count > 0 && property.payment_reinforcement_value > 0 && (
-                          <div className="flex justify-between items-center py-2 border-b border-outline-variant/10">
-                            <span className="text-base text-on-surface-variant">{property.payment_reinforcement_count}x Reforços</span>
-                            <span className="text-xl font-bold text-on-surface">{formatCurrency(property.payment_reinforcement_value || 0)}</span>
+                          <div className="flex flex-wrap justify-between items-baseline gap-2 py-2 border-b border-outline-variant/10">
+                            <span className="text-sm sm:text-base text-on-surface-variant">{property.payment_reinforcement_count}x Reforços</span>
+                            <span className="text-lg sm:text-xl font-bold text-on-surface">{formatCurrency(property.payment_reinforcement_value || 0)}</span>
                           </div>
                         )}
 
                         {property.payment_post_construction > 0 && (
-                          <div className="flex justify-between items-center py-2 border-b border-outline-variant/10">
-                            <span className="text-base text-on-surface-variant">{isStandaloneProperty ? 'Financiamento Bancário' : 'Saldo Pós-Obra'}</span>
-                            <span className="text-xl font-bold text-on-surface">{formatCurrency(property.payment_post_construction || 0)}</span>
+                          <div className="flex flex-wrap justify-between items-baseline gap-2 py-2 border-b border-outline-variant/10">
+                            <span className="text-sm sm:text-base text-on-surface-variant">{isStandaloneProperty ? 'Financiamento Bancário' : 'Saldo Pós-Obra'}</span>
+                            <span className="text-lg sm:text-xl font-bold text-on-surface">{formatCurrency(property.payment_post_construction || 0)}</span>
                           </div>
                         )}
                       </>
@@ -880,48 +1072,48 @@ export const PropertyDetails = () => {
                 {/* Efeito Ouro Premium */}
                 <div className="absolute inset-0 bg-gradient-to-tr from-yellow-400/20 via-transparent to-yellow-400/20 opacity-0 group-hover:opacity-100 transition-opacity duration-700"></div>
                 
-                <div className="bg-surface-container-lowest/95 backdrop-blur-3xl h-full w-full rounded-2xl p-6 md:p-10 relative z-10">
-                  <div className="absolute top-0 right-0 p-8 opacity-5">
-                    <span className="material-symbols-outlined text-[120px] text-emerald-600">moving</span>
+                <div className="bg-surface-container-lowest/95 backdrop-blur-3xl h-full w-full rounded-2xl p-5 sm:p-7 md:p-8 relative z-10">
+                  <div className="absolute top-0 right-0 p-6 opacity-5 pointer-events-none">
+                    <span className="material-symbols-outlined text-[100px] text-emerald-600">moving</span>
                   </div>
                   
-                  <div className="flex flex-col md:flex-row items-start md:items-center gap-4 mb-10">
-                    <div className="w-14 h-14 rounded-full bg-emerald-500/10 flex items-center justify-center border border-emerald-500/30 shrink-0">
-                      <span className="material-symbols-outlined text-emerald-600 text-3xl">insights</span>
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 mb-8">
+                    <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-emerald-500/10 flex items-center justify-center border border-emerald-500/30 shrink-0">
+                      <span className="material-symbols-outlined text-emerald-600 text-2xl sm:text-3xl">insights</span>
                     </div>
                     <div>
-                      <h2 className="text-3xl font-headline font-black text-on-surface tracking-tight">
+                      <h2 className="text-2xl sm:text-3xl font-headline font-black text-on-surface tracking-tight">
                         Potencial de Investimento
                       </h2>
                       <p className="text-emerald-600 font-bold tracking-widest uppercase text-xs mt-1">Análise de Rentabilidade e Valorização</p>
                     </div>
                   </div>
                   
-                  <div className={`grid grid-cols-1 ${!isStandaloneProperty ? 'lg:grid-cols-3' : 'lg:grid-cols-1'} gap-6`}>
+                  <div className={`grid grid-cols-1 ${!isStandaloneProperty ? 'md:grid-cols-2 2xl:grid-cols-3' : 'lg:grid-cols-1'} gap-5`}>
                     {/* Card Valorização */}
                     {!isStandaloneProperty && (
-                      <div className="bg-surface-container-high rounded-xl p-6 border border-emerald-500/10 hover:border-emerald-500/30 transition-all shadow-sm relative overflow-hidden group/card">
-                        <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/5 rounded-bl-[100px] transition-transform group-hover/card:scale-110"></div>
-                        <h3 className="text-[10px] font-black text-on-surface-variant uppercase tracking-[0.2em] mb-6 flex items-center gap-2">
+                      <div className="bg-surface-container-high rounded-xl p-5 sm:p-6 border border-emerald-500/10 hover:border-emerald-500/30 transition-all shadow-sm relative overflow-hidden group/card">
+                        <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/5 rounded-bl-[100px] transition-transform group-hover/card:scale-110 pointer-events-none"></div>
+                        <h3 className="text-[11px] font-black text-on-surface-variant uppercase tracking-[0.15em] mb-5 flex items-center gap-2">
                           <span className="material-symbols-outlined text-[18px] text-emerald-500">trending_up</span> Valorização
                         </h3>
-                        <div className="space-y-4 relative z-10">
+                        <div className="space-y-3.5 relative z-10">
                           {property.roi_appreciation_1y > 0 && (
-                            <div className="flex justify-between items-end">
+                            <div className="flex justify-between items-baseline gap-2">
                               <span className="text-sm font-bold text-on-surface-variant">Em 1 Ano:</span>
-                              <span className="font-black text-3xl text-emerald-600 tracking-tighter">+{property.roi_appreciation_1y}%</span>
+                              <span className="font-black text-2xl sm:text-3xl text-emerald-600 tracking-tight">+{property.roi_appreciation_1y}%</span>
                             </div>
                           )}
                           {property.roi_appreciation_2y > 0 && (
-                            <div className="flex justify-between items-end border-t border-outline-variant/10 pt-3">
+                            <div className="flex justify-between items-baseline gap-2 border-t border-outline-variant/10 pt-3">
                               <span className="text-xs font-bold text-on-surface-variant">Em 2 Anos:</span>
-                              <span className="font-black text-xl text-emerald-600/80">+{property.roi_appreciation_2y}%</span>
+                              <span className="font-black text-lg sm:text-xl text-emerald-600/80">+{property.roi_appreciation_2y}%</span>
                             </div>
                           )}
                           {property.roi_appreciation_3y > 0 && (
-                            <div className="flex justify-between items-end border-t border-outline-variant/10 pt-3">
+                            <div className="flex justify-between items-baseline gap-2 border-t border-outline-variant/10 pt-3">
                               <span className="text-xs font-bold text-on-surface-variant">Em 3 Anos:</span>
-                              <span className="font-black text-xl text-emerald-600/80">+{property.roi_appreciation_3y}%</span>
+                              <span className="font-black text-lg sm:text-xl text-emerald-600/80">+{property.roi_appreciation_3y}%</span>
                             </div>
                           )}
                         </div>
@@ -929,26 +1121,26 @@ export const PropertyDetails = () => {
                     )}
 
                     {/* Card Rentabilidade */}
-                    <div className="bg-surface-container-high rounded-xl p-6 border border-amber-500/10 hover:border-amber-500/30 transition-all shadow-sm relative overflow-hidden group/card">
-                      <div className="absolute top-0 right-0 w-24 h-24 bg-amber-500/5 rounded-bl-[100px] transition-transform group-hover/card:scale-110"></div>
-                      <h3 className="text-[10px] font-black text-on-surface-variant uppercase tracking-[0.2em] mb-6 flex items-center gap-2">
+                    <div className="bg-surface-container-high rounded-xl p-5 sm:p-6 border border-amber-500/10 hover:border-amber-500/30 transition-all shadow-sm relative overflow-hidden group/card">
+                      <div className="absolute top-0 right-0 w-24 h-24 bg-amber-500/5 rounded-bl-[100px] transition-transform group-hover/card:scale-110 pointer-events-none"></div>
+                      <h3 className="text-[11px] font-black text-on-surface-variant uppercase tracking-[0.15em] mb-5 flex items-center gap-2">
                         <span className="material-symbols-outlined text-[18px] text-amber-500">payments</span> Renda Passiva
                       </h3>
-                      <div className="space-y-5 relative z-10">
+                      <div className="space-y-4 relative z-10">
                         {property.rent_seasonal > 0 && (
                           <div className="flex flex-col gap-1">
                             <span className="text-[10px] font-black text-on-surface-variant uppercase tracking-widest">Locação Temporada</span>
-                            <div className="flex items-baseline gap-1">
-                              <span className="font-black text-3xl text-amber-600 tracking-tighter">{formatCurrency(property.rent_seasonal)}</span>
+                            <div className="flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5">
+                              <span className="font-black text-xl sm:text-2xl text-amber-600 tracking-tight break-words">{formatCurrency(property.rent_seasonal)}</span>
                               <span className="text-[10px] text-on-surface-variant/70 font-bold uppercase tracking-wider">/mês est.</span>
                             </div>
                           </div>
                         )}
                         {property.rent_annual > 0 && (
-                          <div className="flex flex-col gap-1 border-t border-outline-variant/10 pt-4">
+                          <div className="flex flex-col gap-1 border-t border-outline-variant/10 pt-3.5">
                             <span className="text-[10px] font-black text-on-surface-variant uppercase tracking-widest">Locação Anual</span>
-                            <div className="flex items-baseline gap-1">
-                              <span className="font-black text-xl text-amber-600/80 tracking-tighter">{formatCurrency(property.rent_annual)}</span>
+                            <div className="flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5">
+                              <span className="font-black text-lg sm:text-xl text-amber-600/80 tracking-tight break-words">{formatCurrency(property.rent_annual)}</span>
                               <span className="text-[10px] text-on-surface-variant/70 font-bold uppercase tracking-wider">/mês est.</span>
                             </div>
                           </div>
@@ -958,36 +1150,36 @@ export const PropertyDetails = () => {
 
                     {/* Card Finalização */}
                     {!isStandaloneProperty && (
-                      <div className="bg-gradient-to-br from-emerald-800 to-emerald-950 rounded-xl p-6 text-emerald-50 relative overflow-hidden shadow-inner flex flex-col justify-between group/card">
-                        <div className="absolute -right-8 -bottom-8 opacity-10 transition-transform duration-700 group-hover/card:scale-150 group-hover/card:rotate-12">
-                          <span className="material-symbols-outlined text-[150px]">diamond</span>
+                      <div className="md:col-span-2 2xl:col-span-1 bg-gradient-to-br from-emerald-800 to-emerald-950 rounded-xl p-5 sm:p-6 text-emerald-50 relative overflow-hidden shadow-inner flex flex-col justify-between group/card">
+                        <div className="absolute -right-8 -bottom-8 opacity-10 transition-transform duration-700 group-hover/card:scale-150 group-hover/card:rotate-12 pointer-events-none">
+                          <span className="material-symbols-outlined text-[140px]">diamond</span>
                         </div>
                         
                         <div>
-                          <h3 className="text-[10px] font-black text-emerald-300 uppercase tracking-[0.2em] mb-6 flex items-center gap-2 relative z-10">
+                          <h3 className="text-[11px] font-black text-emerald-300 uppercase tracking-[0.15em] mb-4 flex items-center gap-2 relative z-10">
                             <span className="material-symbols-outlined text-[18px]">account_balance</span> Projeção nas Chaves
                           </h3>
-                          <div className="space-y-4 relative z-10">
+                          <div className="space-y-3 relative z-10">
                             {property.sale_value_after_keys > 0 && !isStandaloneProperty && (
                               <div className="flex flex-col gap-1">
                                 <span className="text-xs font-bold text-emerald-200/80">Venda Estimada:</span>
-                                <span className="font-black text-4xl text-white drop-shadow-md tracking-tighter">{formatCurrency(property.sale_value_after_keys)}</span>
+                                <span className="font-black text-2xl sm:text-3xl text-white drop-shadow-md tracking-tight break-words">{formatCurrency(property.sale_value_after_keys)}</span>
                               </div>
                             )}
                           </div>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-4 border-t border-emerald-700/50 pt-4 mt-6 relative z-10 bg-black/10 p-3 rounded-lg backdrop-blur-sm">
+                        <div className="grid grid-cols-2 gap-3 border-t border-emerald-700/50 pt-3.5 mt-5 relative z-10 bg-black/15 p-3 rounded-lg backdrop-blur-sm">
                           {property.cub_monthly_rate > 0 && !isStandaloneProperty && (
-                            <div className="flex flex-col gap-1">
-                              <span className="text-[9px] uppercase tracking-widest text-emerald-300 font-bold">Reajuste CUB</span>
-                              <span className="font-black text-lg text-emerald-50">+{property.cub_monthly_rate}%<span className="text-[9px] font-normal"> a.m.</span></span>
+                            <div className="flex flex-col gap-0.5">
+                              <span className="text-[10px] uppercase tracking-wider text-emerald-300 font-bold">Reajuste CUB</span>
+                              <span className="font-black text-base sm:text-lg text-emerald-50">+{property.cub_monthly_rate}%<span className="text-[10px] font-normal"> a.m.</span></span>
                             </div>
                           )}
                           {property.months_until_keys > 0 && !isStandaloneProperty && (
-                            <div className="flex flex-col gap-1">
-                              <span className="text-[9px] uppercase tracking-widest text-emerald-300 font-bold">Prazo Chaves</span>
-                              <span className="font-black text-lg text-emerald-50">{property.months_until_keys} m.</span>
+                            <div className="flex flex-col gap-0.5">
+                              <span className="text-[10px] uppercase tracking-wider text-emerald-300 font-bold">Prazo Chaves</span>
+                              <span className="font-black text-base sm:text-lg text-emerald-50">{property.months_until_keys} m.</span>
                             </div>
                           )}
                         </div>
@@ -995,11 +1187,11 @@ export const PropertyDetails = () => {
                     )}
                   </div>
                   
-                  <div className="mt-10 pt-6 border-t border-outline-variant/10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+                  <div className="mt-8 pt-6 border-t border-outline-variant/10 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                     <p className="text-[10px] text-on-surface-variant/60 font-medium max-w-2xl uppercase tracking-wider leading-relaxed">
                       * Projeções matemáticas baseadas no histórico do mercado. Valores e percentuais não garantem rentabilidade futura absoluta e sofrem variações de acordo com CUB/INCC.
                     </p>
-                    <button onClick={() => setIsSimulatorOpen(true)} className="shrink-0 px-8 py-4 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black uppercase tracking-widest rounded-xl transition-all flex items-center gap-3 shadow-lg shadow-emerald-600/20 hover:shadow-emerald-600/40 hover:-translate-y-1">
+                    <button onClick={() => setIsSimulatorOpen(true)} className="w-full sm:w-auto justify-center shrink-0 px-6 py-3.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black uppercase tracking-widest rounded-xl transition-all flex items-center gap-3 shadow-lg shadow-emerald-600/20 hover:shadow-emerald-600/40 hover:-translate-y-0.5">
                       Simular Investimento <span className="material-symbols-outlined text-sm">arrow_forward</span>
                     </button>
                   </div>
@@ -1119,10 +1311,10 @@ export const PropertyDetails = () => {
         <div className="lg:col-span-4 relative">
           <div className="sticky top-28 space-y-6">
             <div className="bg-surface-container-lowest rounded-xl sunken-shadow overflow-hidden">
-              <div className="p-8 space-y-6">
+              <div className="p-6 xl:p-8 space-y-6">
                 <div>
-                  <h1 className="text-3xl font-headline font-bold text-on-surface mb-2 tracking-tighter">{property.title}</h1>
-                  <p className="text-on-surface-variant flex items-start gap-2 text-sm leading-relaxed mb-6"><span className="material-symbols-outlined text-primary text-lg mt-0.5">location_on</span>{property.location}</p>
+                  <h1 className="text-2xl xl:text-3xl font-headline font-bold text-on-surface mb-2 tracking-tighter break-words">{property.title}</h1>
+                  <p className="text-on-surface-variant flex items-start gap-2 text-sm leading-relaxed mb-6"><span className="material-symbols-outlined text-primary text-lg mt-0.5 shrink-0">location_on</span><span className="break-words">{property.location}</span></p>
                   
                   {showSpecificFeatures && (
                     <div className="flex flex-wrap gap-2 pt-6 border-t border-outline-variant/10">
@@ -1190,6 +1382,13 @@ export const PropertyDetails = () => {
                     </Button>
                   )}
                   <button onClick={() => generatePropertyPDF(property, amenities, gallery, subUnits, theme)} className="w-full py-3 border-2 border-primary text-primary hover:bg-primary hover:text-on-primary transition-all rounded-md font-bold flex items-center justify-center gap-2"><span className="material-symbols-outlined">download</span>{t('common.download_pdf')}</button>
+                  <button 
+                    onClick={() => setIsAdModalOpen(true)}
+                    className="w-full py-3 border border-outline-variant hover:border-primary text-on-surface-variant hover:text-primary transition-all rounded-md font-bold flex items-center justify-center gap-2"
+                  >
+                    <span className="material-symbols-outlined">smart_toy</span>
+                    Link de Atendimento 24h / Anúncios
+                  </button>
                 </div>
               </div>
               {property.builders && (
@@ -1222,7 +1421,19 @@ export const PropertyDetails = () => {
                 </Link>
 
                 <label title="Atualiza preços existentes ou cadastra novas unidades automaticamente" className={`flex items-center gap-3 px-6 py-3 rounded-xl cursor-pointer transition-all duration-300 border-2 border-dashed ${processingPdf ? 'bg-primary/5 border-primary/40 animate-pulse' : 'bg-surface-container-high border-outline-variant hover:border-primary hover:bg-surface-bright'}`}>
-                  {processingPdf ? (<><div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary"></div><span className="text-sm font-bold text-primary uppercase tracking-wider">Extraindo...</span></>) : (<><span className="material-symbols-outlined text-primary">upload_file</span><span className="text-sm font-bold text-on-surface uppercase tracking-wider">Importar Tabela PDF</span></>)}
+                  {processingPdf ? (
+                    <>
+                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary"></div>
+                      <span className="text-sm font-bold text-primary uppercase tracking-wider">
+                        Extraindo... {pdfProgress.percent}%
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="material-symbols-outlined text-primary">upload_file</span>
+                      <span className="text-sm font-bold text-on-surface uppercase tracking-wider">Importar Tabela PDF</span>
+                    </>
+                  )}
                   <input type="file" className="hidden" accept=".pdf" onChange={handlePdfUpload} disabled={processingPdf} />
                 </label>
                 
@@ -1231,6 +1442,24 @@ export const PropertyDetails = () => {
                 </button>
               </div>
             </div>
+
+            {processingPdf && (
+              <div className="mb-8 p-6 rounded-2xl bg-primary/5 border border-primary/20 shadow-inner animate-in fade-in duration-300">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-3">
+                    <span className="material-symbols-outlined text-primary animate-spin">autorenew</span>
+                    <span className="text-sm font-bold text-on-surface">{pdfProgress.message || "Processando tabela PDF..."}</span>
+                  </div>
+                  <span className="text-lg font-headline font-black text-primary">{pdfProgress.percent}%</span>
+                </div>
+                <div className="w-full h-3 bg-surface-container-highest rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-primary transition-all duration-300 ease-out rounded-full"
+                    style={{ width: `${pdfProgress.percent}%` }}
+                  />
+                </div>
+              </div>
+            )}
 
             {subUnits.length > 0 ? (
               <div className="space-y-4">
@@ -1608,7 +1837,7 @@ export const PropertyDetails = () => {
             pdfUrl={floorPlanPdfUrl}
             initialPage={activePlanToCrop.index}
             onComplete={(images) => {
-               setCroppedImagesToAssociate({ name: activePlanToCrop.name, dataUrl: images[0] });
+               setCroppedImagesToAssociate({ name: activePlanToCrop.name, dataUrls: images });
                setActivePlanToCrop(null);
             }}
             onCancel={() => setActivePlanToCrop(null)}
@@ -1621,9 +1850,9 @@ export const PropertyDetails = () => {
           <div className="bg-surface-container-lowest w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden flex flex-col sunken-shadow border border-outline-variant/10">
             <div className="p-8 border-b border-outline-variant/10 flex justify-between items-center bg-surface-container-low">
               <div>
-                <h2 className="text-2xl font-headline font-bold text-on-surface">Atribuir Planta</h2>
+                <h2 className="text-2xl font-headline font-bold text-on-surface">Atribuir Planta(s)</h2>
                 <p className="text-sm text-on-surface-variant font-body mt-2">
-                  Planta: <strong className="text-primary">{croppedImagesToAssociate.name}</strong>
+                  Planta: <strong className="text-primary">{croppedImagesToAssociate.name}</strong> ({croppedImagesToAssociate.dataUrls.length} recorte{croppedImagesToAssociate.dataUrls.length > 1 ? 's' : ''})
                 </p>
               </div>
               <button onClick={() => setCroppedImagesToAssociate(null)} className="w-12 h-12 flex items-center justify-center rounded-full hover:bg-surface-container-high transition-colors shadow-sm border border-outline-variant/10">
@@ -1633,8 +1862,10 @@ export const PropertyDetails = () => {
             
             <div className="p-8 max-h-[50vh] overflow-y-auto">
               <div className="flex gap-4 mb-6">
-                <div className="w-1/3 bg-surface-container rounded-xl overflow-hidden shadow-inner flex items-center justify-center border border-outline-variant/10 p-2">
-                  <img src={croppedImagesToAssociate.dataUrl} alt="Preview" className="max-w-full max-h-32 object-contain rounded-lg" />
+                <div className="w-1/3 bg-surface-container rounded-xl overflow-hidden shadow-inner flex flex-col gap-2 items-center justify-center border border-outline-variant/10 p-2 max-h-60 overflow-y-auto">
+                  {croppedImagesToAssociate.dataUrls.map((url, idx) => (
+                    <img key={idx} src={url} alt={`Preview ${idx + 1}`} className="max-w-full max-h-28 object-contain rounded-lg" />
+                  ))}
                 </div>
                 <div className="w-2/3">
                   <h3 className="text-sm font-bold text-on-surface uppercase tracking-widest mb-4">Selecione as Unidades</h3>
@@ -1667,6 +1898,96 @@ export const PropertyDetails = () => {
                 {isAssociating ? <span className="material-symbols-outlined animate-spin">sync</span> : <span className="material-symbols-outlined">save</span>}
                 {isAssociating ? 'Salvando...' : 'Salvar Associação'}
               </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isAdModalOpen && (
+        <div className="fixed inset-0 z-[250] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-300">
+          <div className="bg-surface-container-lowest w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden flex flex-col sunken-shadow border border-outline-variant/10">
+            <div className="p-8 border-b border-outline-variant/10 flex justify-between items-center bg-surface-container-low">
+              <div>
+                <h2 className="text-2xl font-headline font-bold text-on-surface flex items-center gap-2">
+                  <span className="material-symbols-outlined text-primary">smart_toy</span>
+                  Atendimento Automatizado 24h (Sem CNPJ)
+                </h2>
+                <p className="text-sm text-on-surface-variant font-body mt-1">
+                  Use este link no seu WhatsApp Business ou nos seus anúncios para que o cliente seja atendido pelo Chat Inteligente deste imóvel.
+                </p>
+              </div>
+              <button onClick={() => setIsAdModalOpen(false)} className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-surface-container-high transition-colors">
+                <span className="material-symbols-outlined text-on-surface-variant">close</span>
+              </button>
+            </div>
+
+            <div className="p-8 space-y-6 overflow-y-auto max-h-[70vh]">
+              {/* Opção 1: Mensagem Automática do WhatsApp Business */}
+              <div className="p-5 rounded-2xl bg-surface-container-low border border-outline-variant/20 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-black uppercase tracking-widest text-primary">
+                    1. Mensagem de Saudação p/ WhatsApp Business
+                  </span>
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
+                    Recomendado
+                  </span>
+                </div>
+                <p className="text-xs text-on-surface-variant leading-relaxed">
+                  Quando o cliente entrar no seu WhatsApp pelo anúncio, envie (ou configure na Saudação Automática do WhatsApp Business) esta mensagem:
+                </p>
+                <div className="p-3 rounded-xl bg-surface-container-highest/60 text-xs text-on-surface font-mono select-all break-words">
+                  {`Olá! Que ótimo receber seu contato sobre o *${property.title}*! 👋\n\nPara ver fotos, plano de pagamento, unidades disponíveis, imóveis parecidos e tirar dúvidas na hora com nosso *Assistente Virtual 24h*, acesse:\n${window.location.origin}${import.meta.env.BASE_URL.replace(/\/$/, '')}/view/${property.id}?chat=open`}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const publicChatUrl = `${window.location.origin}${import.meta.env.BASE_URL.replace(/\/$/, '')}/view/${property.id}?chat=open`;
+                    const msg = `Olá! Que ótimo receber seu contato sobre o *${property.title}*! 👋\n\nPara ver fotos, plano de pagamento, unidades disponíveis, imóveis parecidos e tirar dúvidas na hora com nosso *Assistente Virtual 24h*, acesse:\n${publicChatUrl}`;
+                    navigator.clipboard.writeText(msg);
+                    alert("✅ Mensagem de resposta automática copiada!");
+                  }}
+                  className="w-full py-3 rounded-xl bg-primary text-on-primary text-xs font-bold uppercase tracking-widest hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
+                >
+                  <span className="material-symbols-outlined text-base">content_copy</span>
+                  Copiar Mensagem p/ WhatsApp
+                </button>
+              </div>
+
+              {/* Opção 2: Link Direto com Chat Aberto */}
+              <div className="p-5 rounded-2xl bg-surface-container-low border border-outline-variant/20 space-y-3">
+                <span className="text-xs font-black uppercase tracking-widest text-primary block">
+                  2. Link Direto do Imóvel com Chat 24h Aberto
+                </span>
+                <p className="text-xs text-on-surface-variant leading-relaxed">
+                  Você também pode colocar este link direto como destino do botão "Saiba Mais" no Meta Ads ou Google Ads:
+                </p>
+                <div className="p-3 rounded-xl bg-surface-container-highest/60 text-xs text-on-surface font-mono select-all break-all">
+                  {`${window.location.origin}${import.meta.env.BASE_URL.replace(/\/$/, '')}/view/${property.id}?chat=open`}
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const publicChatUrl = `${window.location.origin}${import.meta.env.BASE_URL.replace(/\/$/, '')}/view/${property.id}?chat=open`;
+                      navigator.clipboard.writeText(publicChatUrl);
+                      alert("✅ Link direto copiado!");
+                    }}
+                    className="py-3 rounded-xl bg-surface-container-high hover:bg-primary hover:text-on-primary text-on-surface text-xs font-bold uppercase tracking-widest transition-colors flex items-center justify-center gap-2 border border-outline-variant/20"
+                  >
+                    <span className="material-symbols-outlined text-base">link</span>
+                    Copiar Link Direto
+                  </button>
+                  <Link
+                    to={`/view/${property.id}?chat=open`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold uppercase tracking-widest transition-colors flex items-center justify-center gap-2"
+                  >
+                    <span className="material-symbols-outlined text-base">open_in_new</span>
+                    Testar Chat Agora
+                  </Link>
+                </div>
+              </div>
             </div>
           </div>
         </div>

@@ -52,12 +52,12 @@ export const SideNavBar = () => {
   };
 
   return (
-    <nav className="hidden md:flex flex-col h-screen w-64 fixed left-0 top-0 bg-surface-container-low py-8 z-50">
-      <div className="px-8 mb-12">
+    <nav className="hidden md:flex flex-col h-screen w-64 fixed left-0 top-0 bg-surface-container-low py-5 z-50 border-r border-outline-variant/10">
+      <div className="px-6 mb-5 shrink-0">
         <h1 className="text-xl font-bold tracking-tight text-on-surface font-headline">{t('nav.ledger')}</h1>
-        <p className="text-sm text-on-surface/60 font-body">{t('nav.consultant_pro')}</p>
+        <p className="text-xs text-on-surface/60 font-body mt-0.5">{t('nav.consultant_pro')}</p>
       </div>
-      <div className="flex-1 px-4 space-y-2">
+      <div className="flex-1 px-3 pb-6 space-y-1 overflow-y-auto min-h-0">
         {navItems.map((item) => {
           const isActive = isPathActive(item.path);
           
@@ -66,24 +66,17 @@ export const SideNavBar = () => {
               key={item.path}
               to={item.path}
               className={cn(
-                "flex items-center px-4 py-3 transition-colors font-label",
+                "flex items-center px-3.5 py-2.5 rounded-lg transition-colors font-label text-sm",
                 isActive
                   ? "text-primary font-bold border-r-4 border-primary bg-surface-container-high"
                   : "text-on-surface/60 hover:bg-surface-container-high"
               )}
             >
-              <span className="material-symbols-outlined mr-3">{item.icon}</span>
-              {item.name}
+              <span className="material-symbols-outlined mr-3 text-[20px] shrink-0">{item.icon}</span>
+              <span className="truncate">{item.name}</span>
             </Link>
           );
         })}
-      </div>
-      <div className="px-6 mt-auto">
-        <Link to="/developments/new?type=property">
-          <button className="w-full py-3 px-4 bg-gradient-primary text-on-primary rounded-md font-label font-medium hover:opacity-90 transition-opacity text-center">
-            {t('nav.new_development')}
-          </button>
-        </Link>
       </div>
     </nav>
   );

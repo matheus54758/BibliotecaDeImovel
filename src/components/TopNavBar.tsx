@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { useState, useRef, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { useNavigate, NavLink, Link } from 'react-router-dom';
+import { useNavigate, NavLink } from 'react-router-dom';
 import { cn } from '../lib/utils';
 import { useUserTier } from '../hooks/useUserTier';
 
@@ -26,6 +26,7 @@ export const TopNavBar = () => {
     { name: t('nav.overview'), icon: 'dashboard', path: '/' },
     { name: t('nav.project_developments'), icon: 'corporate_fare', path: '/project-developments' },
     { name: t('nav.developments'), icon: 'apartment', path: '/developments' },
+    { name: 'Aluguéis', icon: 'real_estate_agent', path: '/rentals' },
     { name: t('nav.lands'), icon: 'landscape', path: '/lands' },
     { name: t('nav.construction'), icon: 'engineering', path: '/builders' },
     { name: t('nav.consultancy'), icon: 'business_center', path: '/consultancy' },
@@ -221,7 +222,7 @@ export const TopNavBar = () => {
           </button>
         </div>
 
-        <div className="flex-1 px-4 py-6 space-y-1 overflow-y-auto">
+        <div className="flex-1 px-4 py-4 pb-8 space-y-1 overflow-y-auto min-h-0">
           {navItems.map((item) => (
             <NavLink
               key={item.path}
@@ -229,26 +230,17 @@ export const TopNavBar = () => {
               onClick={() => setShowMobileMenu(false)}
               className={({ isActive }) =>
                 cn(
-                  "flex items-center px-4 py-4 rounded-xl transition-all font-label",
+                  "flex items-center px-4 py-2.5 rounded-xl transition-all font-label",
                   isActive
                     ? "text-primary font-bold bg-primary/10 shadow-sm"
                     : "text-on-surface/60 hover:bg-surface-container-high"
                 )
               }
             >
-              <span className="material-symbols-outlined mr-4 text-2xl">{item.icon}</span>
-              <span className="text-base">{item.name}</span>
+              <span className="material-symbols-outlined mr-3.5 text-xl">{item.icon}</span>
+              <span className="text-sm">{item.name}</span>
             </NavLink>
           ))}
-        </div>
-
-        <div className="p-6 mt-auto border-t border-surface-container-highest">
-          <Link to="/developments/new?type=property" onClick={() => setShowMobileMenu(false)}>
-            <button className="w-full py-4 px-4 bg-primary text-on-primary rounded-xl font-bold shadow-lg shadow-primary/20 flex items-center justify-center gap-2">
-              <span className="material-symbols-outlined">add</span>
-              {t('developments.new_asset')}
-            </button>
-          </Link>
         </div>
       </div>
     </>

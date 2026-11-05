@@ -191,6 +191,20 @@ export const Clients = () => {
     }
   };
 
+  const getPresentedProperties = (item: Interaction): string[] => {
+    const match = (item.notes || '').match(/📍\s*Unidades\s+visualizadas\/clicadas:\s*([^\n]+)/i);
+    if (match && match[1]) {
+      const units = match[1]
+        .split(/\s*➔\s*/)
+        .map(s => s.trim())
+        .filter(Boolean);
+      if (units.length > 0) {
+        return Array.from(new Set(units));
+      }
+    }
+    return [item.developments?.title || 'Não especificado'];
+  };
+
   const filteredInteractions = interactions.filter(i => 
     i.client_name.toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -267,16 +281,20 @@ export const Clients = () => {
 
               <div className="bg-surface-container-low rounded-2xl p-4 mb-4 border border-outline-variant/5">
                 <p className="text-[10px] font-black text-on-surface-variant/40 uppercase tracking-widest mb-2">{t('clients.property')}</p>
-                <div className="flex items-center gap-2">
-                  <span className="material-symbols-outlined text-primary text-lg">apartment</span>
-                  <span className="font-bold text-on-surface truncate">{item.developments?.title || 'Não especificado'}</span>
+                <div className="space-y-1.5">
+                  {getPresentedProperties(item).map((propName, idx) => (
+                    <div key={idx} className="flex items-start gap-2">
+                      <span className="material-symbols-outlined text-primary text-lg shrink-0 mt-0.5">apartment</span>
+                      <span className="font-bold text-sm text-on-surface break-words leading-snug">{propName}</span>
+                    </div>
+                  ))}
                 </div>
               </div>
 
               {item.notes && (
                 <div className="mb-6">
                   <p className="text-[10px] font-black text-on-surface-variant/40 uppercase tracking-widest mb-1">{t('clients.notes')}</p>
-                  <p className="text-sm text-on-surface/70 line-clamp-3 font-body leading-relaxed">{item.notes}</p>
+                  <p className="text-sm text-on-surface/70 whitespace-pre-line font-body leading-relaxed">{item.notes}</p>
                 </div>
               )}
 

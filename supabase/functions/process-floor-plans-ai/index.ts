@@ -5,12 +5,35 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': '*',
 }
 
+async function callGeminiWithFallback(apiKey: string, payload: any) {
+  const models = [
+    "https://generativelanguage.googleapis.com/v1/models/gemini-3.5-flash:generateContent",
+    "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent",
+    "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+  ];
+
+  let lastResult: any = null;
+  for (const baseUrl of models) {
+    const response = await fetch(`${baseUrl}?key=${apiKey}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const result = await response.json();
+    if (!result.error) {
+      return result;
+    }
+    lastResult = result;
+    console.warn(`Modelo ${baseUrl} falhou (${result.error?.message}), tentando fallback...`);
+  }
+  return lastResult;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
   try {
-    const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY');
-    const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1/models/gemini-3.5-flash:generateContent?key=${GEMINI_API_KEY}`;
+    const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY') || "";
 
     const { images } = await req.json();
     if (!images || !Array.isArray(images)) {
@@ -46,20 +69,14 @@ serve(async (req) => {
 
     console.log(`Enviando lote de ${images.length} imagens para o Gemini analisar.`);
 
-    const response = await fetch(GEMINI_API_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts }],
-        generationConfig: { 
-          temperature: 0.1
-        }
-      })
+    const result = await callGeminiWithFallback(GEMINI_API_KEY, {
+      contents: [{ parts }],
+      generationConfig: { 
+        temperature: 0.1
+      }
     });
-
-    const result = await response.json();
     
-    if (result.error) {
+    if (result?.error) {
        return new Response(JSON.stringify({ error: "GOOGLE_ERROR", details: result.error.message }), {
          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
        });

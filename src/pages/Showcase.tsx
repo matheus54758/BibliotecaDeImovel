@@ -172,7 +172,7 @@ export const Showcase = () => {
         )}
 
         <section className="bg-surface-container-lowest p-6 rounded-3xl sunken-shadow mb-12 space-y-8 border border-outline-variant/10">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-6 items-end">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-6 items-end">
             <div className="lg:col-span-2 space-y-2">
               <label className="text-xs font-black uppercase tracking-widest text-on-surface-variant">Preço Máximo</label>
               <input 
@@ -193,7 +193,7 @@ export const Showcase = () => {
                 className="w-full bg-surface-container-high border-0 rounded-xl py-3 px-4 text-on-surface"
               />
             </div>
-            <div className="lg:col-span-1 space-y-2">
+            <div className="lg:col-span-2 space-y-2">
               <label className="text-xs font-black uppercase tracking-widest text-on-surface-variant">UF</label>
               <input 
                 type="text" 
@@ -213,7 +213,7 @@ export const Showcase = () => {
                 className="w-full bg-surface-container-high border-0 rounded-xl py-3 px-4 text-on-surface"
               />
             </div>
-            <div className="lg:col-span-4 space-y-2">
+            <div className="sm:col-span-2 lg:col-span-3 space-y-2">
               <label className="text-xs font-black uppercase tracking-widest text-on-surface-variant">Status</label>
               <div className="flex flex-wrap gap-2">
                 {[
